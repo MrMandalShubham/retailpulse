@@ -58,16 +58,41 @@ export function extractFromHtml(html: string, url: string, rules: RuleEngine): H
   // <title> and standard meta tags.
   const title = cleanText($("title").first().text());
   addCandidate(candidates, "name", stripSiteSuffix(title), "meta_tags");
-  addCandidate(candidates, "description", $('meta[name="description"]').attr("content"), "meta_tags");
+  addCandidate(
+    candidates,
+    "description",
+    $('meta[name="description"]').attr("content"),
+    "meta_tags",
+  );
 
   // OpenGraph.
   addCandidate(candidates, "name", $('meta[property="og:title"]').attr("content"), "opengraph");
-  addCandidate(candidates, "description", $('meta[property="og:description"]').attr("content"), "opengraph");
+  addCandidate(
+    candidates,
+    "description",
+    $('meta[property="og:description"]').attr("content"),
+    "opengraph",
+  );
   const ogImage = normalizeImageUrl(url, $('meta[property="og:image"]').attr("content"));
   addCandidate(candidates, "image", ogImage, "opengraph");
-  addCandidate(candidates, "brand", $('meta[property="product:brand"]').attr("content"), "opengraph");
-  addCandidate(candidates, "price_text", $('meta[property="product:price:amount"]').attr("content"), "opengraph");
-  addCandidate(candidates, "currency", $('meta[property="product:price:currency"]').attr("content"), "opengraph");
+  addCandidate(
+    candidates,
+    "brand",
+    $('meta[property="product:brand"]').attr("content"),
+    "opengraph",
+  );
+  addCandidate(
+    candidates,
+    "price_text",
+    $('meta[property="product:price:amount"]').attr("content"),
+    "opengraph",
+  );
+  addCandidate(
+    candidates,
+    "currency",
+    $('meta[property="product:price:currency"]').attr("content"),
+    "opengraph",
+  );
   const ogType = cleanText($('meta[property="og:type"]').attr("content"));
 
   // JSON-LD (schema.org Product).
@@ -101,7 +126,9 @@ export function extractFromHtml(html: string, url: string, rules: RuleEngine): H
   // URL hints (weak but useful signals).
   const pathName = safePathname(url);
   if (PRODUCT_PATH_HINTS.some((hint) => pathName.includes(hint))) {
-    const slugWords = cleanText(decodeURIComponent(pathName.split("/").pop() ?? "").replace(/[-_]+/g, " "));
+    const slugWords = cleanText(
+      decodeURIComponent(pathName.split("/").pop() ?? "").replace(/[-_]+/g, " "),
+    );
     addCandidate(candidates, "name", slugWords, "url_hint");
   }
 

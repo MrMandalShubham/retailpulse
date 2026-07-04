@@ -45,7 +45,12 @@ describe("createRuleEngine", () => {
   it("ignores inactive rules and rules scoped to other sources", () => {
     const engine = createRuleEngine(
       [
-        rule({ ruleType: "brand_alias", matchKey: "x", normalizedValue: "Inactive", active: false }),
+        rule({
+          ruleType: "brand_alias",
+          matchKey: "x",
+          normalizedValue: "Inactive",
+          active: false,
+        }),
         rule({
           ruleType: "brand_alias",
           matchKey: "y",

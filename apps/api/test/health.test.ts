@@ -12,6 +12,11 @@ const testConfig: AppConfig = {
   DO_SPACES_FORCE_PATH_STYLE: false,
   INGEST_FETCH_TIMEOUT_MS: 15_000,
   TRANSFORM_MAX_DOCUMENTS: 100,
+  AI_PROVIDER: "mock",
+  AI_MODEL: "mistral-small-latest",
+  AI_REVIEW_MAX_ITEMS: 20,
+  AI_TIMEOUT_MS: 30_000,
+  AI_MAX_RETRIES: 2,
 };
 
 describe("health endpoints", () => {

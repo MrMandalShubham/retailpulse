@@ -93,12 +93,33 @@ has ZERO canonical writes (only reads master data for fuzzy matching).
 staged_product_offers deliberately deferred. Deps added: cheerio,
 fastest-levenshtein (worker only).
 
-**Explicitly OUT of scope until instructed (Phase 4+):** real AI/LLM
-extraction or escalation, embeddings/semantic retrieval, cross-source product
-deduplication, automatic taxonomy creation, promotion writes into the 8-table
-core, Playwright/browser scraping, smart crawling (sitemaps, robots.txt,
-pagination), Redis queues and schedulers, dashboards/frontends, report
-generation, presigned URLs / bucket listing.
+**Phase 4 (done):** AI-assisted review + selective escalation. Tables
+`ai_review_runs`, `ai_review_items` (incl. `review_reason`),
+`ai_rule_suggestions` (partial-unique open-fingerprint dup guard on
+observation_id+rule_type+source_scope+match_key). `@dip/ai` package:
+provider-agnostic contracts live in `@dip/domain` ai-enrichment; ONE shared
+system prompt + zod-validated strict-JSON decision contract
+(resolved/partially_resolved/unresolved/rejected); adapters = Mistral (plain
+fetch REST, NO vendor SDK, retry on 429/5xx) + deterministic mock. Provider
+chosen ONLY via config (`AI_PROVIDER`, default mock — safe; client's choice is
+mistral + `MISTRAL_API_KEY`). Worker `pnpm ai-review:run`: strict gating
+(ai_recommended staged products in needs_review/pending on product/unknown
+pages; open observations of types unknown_brand/unknown_category/
+unknown_product_type/conflicting_price/missing_required_field — unseen_pattern
+and weak_product_candidate excluded; not-already-reviewed; AI_REVIEW_MAX_ITEMS
+cap). AI output is ADVISORY: suggestions land in ai_rule_suggestions;
+normalization_rules changes ONLY via POST
+/ai-reviews/rule-suggestions/:id/approve (learned_from_ai=true, observation →
+promoted_to_rule; duplicates → 409) or :id/reject. Read endpoints under
+/ai-reviews/*. Vendor wire formats must NEVER leak outside
+packages/ai/src/providers/. Canonical core still has ZERO automated writes.
+
+**Explicitly OUT of scope until instructed (Phase 5+):** automatic canonical
+product promotion, embeddings/semantic retrieval, chat/end-user AI features,
+autonomous taxonomy generation, human moderation UI, cross-source product
+deduplication, Playwright/browser scraping, smart crawling (sitemaps,
+robots.txt, pagination), Redis queues and schedulers, dashboards/frontends,
+report generation, presigned URLs / bucket listing.
 
 ## Conventions
 

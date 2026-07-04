@@ -45,7 +45,9 @@ export interface RuleEngine {
 export function createRuleEngine(rules: RuleRow[], sourceSlug: string): RuleEngine {
   // Scoped-before-global, then by priority, so the first hit wins.
   const applicable = rules
-    .filter((r) => r.active && (r.sourceScope === GLOBAL_RULE_SCOPE || r.sourceScope === sourceSlug))
+    .filter(
+      (r) => r.active && (r.sourceScope === GLOBAL_RULE_SCOPE || r.sourceScope === sourceSlug),
+    )
     .sort((a, b) => {
       if (a.sourceScope !== b.sourceScope) {
         return a.sourceScope === GLOBAL_RULE_SCOPE ? 1 : -1;

@@ -235,7 +235,10 @@ export interface PromotionService {
  * need AI for the same case.
  */
 export interface ObservationResolutionService {
-  resolve(observationId: string, resolution: { suggestedValue: string; notes?: string }): Promise<void>;
+  resolve(
+    observationId: string,
+    resolution: { suggestedValue: string; notes?: string },
+  ): Promise<void>;
   promoteToRule(
     observationId: string,
     rule: Pick<

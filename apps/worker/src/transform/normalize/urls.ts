@@ -27,10 +27,7 @@ export function stripTracking(url: string): string {
 }
 
 /** Normalize an image URL: absolutize, upgrade protocol-relative, strip tracking. */
-export function normalizeImageUrl(
-  baseUrl: string,
-  src: string | null | undefined,
-): string | null {
+export function normalizeImageUrl(baseUrl: string, src: string | null | undefined): string | null {
   if (!src) return null;
   const candidate = src.startsWith("//") ? `https:${src}` : src;
   const absolute = absolutize(baseUrl, candidate);

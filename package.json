@@ -20,7 +20,8 @@
     "db:studio": "pnpm --filter @dip/db studio",
     "bucket:ensure": "pnpm --filter @dip/storage ensure-bucket",
     "ingest:run": "pnpm --filter @dip/worker ingest",
-    "transform:run": "pnpm --filter @dip/worker transform"
+    "transform:run": "pnpm --filter @dip/worker transform",
+    "ai-review:run": "pnpm --filter @dip/worker ai-review"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",

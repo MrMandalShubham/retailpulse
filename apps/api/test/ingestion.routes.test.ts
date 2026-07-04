@@ -15,6 +15,11 @@ function makeConfig(databaseUrl: string): AppConfig {
     DO_SPACES_FORCE_PATH_STYLE: false,
     INGEST_FETCH_TIMEOUT_MS: 15_000,
     TRANSFORM_MAX_DOCUMENTS: 100,
+    AI_PROVIDER: "mock",
+    AI_MODEL: "mistral-small-latest",
+    AI_REVIEW_MAX_ITEMS: 20,
+    AI_TIMEOUT_MS: 30_000,
+    AI_MAX_RETRIES: 2,
   };
 }
 
@@ -25,7 +30,10 @@ describe("ingestion routes — validation (no database needed)", () => {
     const badLimit = await app.inject({ method: "GET", url: "/ingestion/jobs?limit=abc" });
     expect(badLimit.statusCode).toBe(400);
 
-    const badUuid = await app.inject({ method: "GET", url: "/ingestion/jobs/not-a-uuid/raw-documents" });
+    const badUuid = await app.inject({
+      method: "GET",
+      url: "/ingestion/jobs/not-a-uuid/raw-documents",
+    });
     expect(badUuid.statusCode).toBe(400);
 
     await app.close();

@@ -12,6 +12,7 @@ export default defineConfig({
       "@dip/domain": r("./packages/domain/src/index.ts"),
       "@dip/db": r("./packages/db/src/index.ts"),
       "@dip/storage": r("./packages/storage/src/index.ts"),
+      "@dip/ai": r("./packages/ai/src/index.ts"),
     },
   },
   test: {

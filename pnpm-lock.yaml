@@ -60,6 +60,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@dip/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@dip/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -91,6 +94,22 @@ importers:
       tsx:
         specifier: ^4.20.0
         version: 4.23.0
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+
+  packages/ai:
+    dependencies:
+      '@dip/domain':
+        specifier: workspace:*
+        version: link:../domain
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.20.0
       typescript:
         specifier: ^5.8.0
         version: 5.9.3

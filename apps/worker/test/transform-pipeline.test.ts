@@ -72,7 +72,9 @@ describe("processDocument", () => {
     // brand_alias rule normalized "cosrx" -> "COSRX" without AI.
     expect(staged.extractedBrand).toBe("COSRX");
     expect(staged.extractedCurrency).toBe("USD");
-    expect(staged.primaryImageUrl).toBe("https://img.example-store.test/products/snail-essence.jpg");
+    expect(staged.primaryImageUrl).toBe(
+      "https://img.example-store.test/products/snail-essence.jpg",
+    );
     expect(staged.extractionMethod).toBe("jsonld");
 
     const payload = staged.normalizedPayload as { price: { value: number; currency: string } };
@@ -112,7 +114,12 @@ describe("processDocument", () => {
   });
 
   it("classifies a junk page as non-product with no staged row", () => {
-    const result = processDocument(doc("d3", "https://shop.test/support"), JUNK_HTML, engine, EMPTY_MASTER);
+    const result = processDocument(
+      doc("d3", "https://shop.test/support"),
+      JUNK_HTML,
+      engine,
+      EMPTY_MASTER,
+    );
     expect(result.staged).toBeNull();
     expect(result.observations[0]?.suggestedValue).toBe("non_product");
   });

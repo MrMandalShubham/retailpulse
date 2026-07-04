@@ -6,7 +6,17 @@ raw layer (ELT), transforms it with AI + deterministic rules, and publishes
 clean records into a normalized 8-table core that powers product comparison,
 dashboards, reports, and a private AI.
 
-**Current status: Phase 3 — hybrid transform + normalization engine.**
+**Current status: Phase 4 — AI-assisted review and selective escalation.**
+A provider-agnostic AI layer reviews ONLY the unresolved leftovers from the
+Phase 3 transform (gated: `ai_recommended` staged products and open
+field-level observations). Business logic talks to internal review contracts;
+vendors are adapters (`@dip/ai`: Mistral via plain REST + a deterministic
+mock, default `AI_PROVIDER=mock` so nothing calls a paid API accidentally).
+AI decisions are structured, validated, and advisory — rule candidates land in
+`ai_rule_suggestions` and become `normalization_rules` (learned_from_ai) only
+through the operator approval endpoint. Canonical tables remain untouched.
+
+Previous phase summary (Phase 3 — hybrid transform + normalization engine):
 On top of the Phase 2 raw layer, a local (no-AI) transform pipeline extracts
 product candidates from raw HTML (title/meta/OpenGraph/JSON-LD/DOM heuristics),
 normalizes them with reusable `normalization_rules` (brand aliases, currency
@@ -27,6 +37,7 @@ packages/
   domain/       @dip/domain — shared domain contracts (pure types, no runtime deps)
   db/           @dip/db — Drizzle schema, pg client, SQL migrations, seed script
   storage/      @dip/storage — S3-compatible raw object storage (Spaces/MinIO)
+  ai/           @dip/ai — provider-agnostic AI review (prompt contract, Mistral + mock adapters)
 services/       Reserved for Python services (advanced scraping, AI transform — Phase 3+)
 ```
 
@@ -80,7 +91,10 @@ pnpm ingest:run
 # 9. Run one hybrid transform cycle (raw docs -> staged_products + observations)
 pnpm transform:run
 
-# 10. Run the API (http://localhost:3000)
+# 10. Run one AI review cycle over unresolved leftovers (mock provider by default)
+pnpm ai-review:run
+
+# 11. Run the API (http://localhost:3000)
 pnpm dev:api
 ```
 
@@ -111,23 +125,41 @@ The MinIO console at http://localhost:9001 (user `dip-minio`, password
 - `GET /transforms/rules` — active normalization rules (the system's learned
   intelligence; rows added here change behavior on the next run, no code).
 
+### Watching the AI review layer
+
+- `GET /ai-reviews/runs` and `/ai-reviews/runs/:id` — review batches with
+  per-status item counts.
+- `GET /ai-reviews/items?status=&provider=` — every item escalated to AI, with
+  `review_reason`, full input payload, raw output, and the parsed decision.
+- `GET /ai-reviews/rule-suggestions?status=` — AI-proposed rules awaiting the
+  approval path.
+- `POST /ai-reviews/rule-suggestions/:id/approve` — the ONLY way an AI
+  suggestion becomes a `normalization_rules` row (`learned_from_ai = true`);
+  also moves the linked observation to `promoted_to_rule`.
+- `POST /ai-reviews/rule-suggestions/:id/reject` — dismiss a bad suggestion.
+
+Provider selection is config-only: `AI_PROVIDER=mock` (default, free) or
+`AI_PROVIDER=mistral` + `MISTRAL_API_KEY`. Swapping vendors later means one
+new adapter file in `packages/ai/src/providers/` — no business-logic changes.
+
 ## Commands
 
-| Command            | What it does                                          |
-| ------------------ | ----------------------------------------------------- |
-| `pnpm build`       | Build all packages/apps (topological order)           |
-| `pnpm dev:api`     | Run the API with hot reload                           |
-| `pnpm dev:worker`  | Run the idle worker skeleton (boot + validate + idle) |
-| `pnpm ingest:run`  | One-shot raw ingestion cycle (Phase 2 manual trigger): reads enabled sources, fetches up to 5 seed URLs each, stores payloads in object storage, records crawl_jobs + raw_documents |
+| Command              | What it does                                                                                                                                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`         | Build all packages/apps (topological order)                                                                                                                                                                      |
+| `pnpm dev:api`       | Run the API with hot reload                                                                                                                                                                                      |
+| `pnpm dev:worker`    | Run the idle worker skeleton (boot + validate + idle)                                                                                                                                                            |
+| `pnpm ingest:run`    | One-shot raw ingestion cycle (Phase 2 manual trigger): reads enabled sources, fetches up to 5 seed URLs each, stores payloads in object storage, records crawl_jobs + raw_documents                              |
 | `pnpm transform:run` | One-shot hybrid transform cycle (Phase 3, no AI): eligible raw docs → deterministic extraction → rule-based normalization → staged_products + transform_observations. Add `-- --reprocess` to regenerate staging |
-| `pnpm db:seed`     | Idempotent seed of the approved ingestion source      |
-| `pnpm bucket:ensure` | Create the raw-storage bucket (local MinIO helper)  |
-| `pnpm lint`        | ESLint over the whole repo                            |
-| `pnpm format`      | Prettier write                                        |
-| `pnpm test`        | Vitest — DB-independent tests always run; integration tests against a migrated DB run when `TEST_DATABASE_URL` is set |
-| `pnpm db:generate` | Generate SQL migration from Drizzle schema changes    |
-| `pnpm db:migrate`  | Apply pending migrations from `packages/db/migrations`|
-| `pnpm db:studio`   | Browse the database with Drizzle Studio               |
+| `pnpm ai-review:run` | One-shot AI review cycle (Phase 4): gated unresolved leftovers → configured provider (`AI_PROVIDER`) → ai_review_items + ai_rule_suggestions. Advisory only; rules change only via the approval endpoint         |
+| `pnpm db:seed`       | Idempotent seed of the approved ingestion source                                                                                                                                                                 |
+| `pnpm bucket:ensure` | Create the raw-storage bucket (local MinIO helper)                                                                                                                                                               |
+| `pnpm lint`          | ESLint over the whole repo                                                                                                                                                                                       |
+| `pnpm format`        | Prettier write                                                                                                                                                                                                   |
+| `pnpm test`          | Vitest — DB-independent tests always run; integration tests against a migrated DB run when `TEST_DATABASE_URL` is set                                                                                            |
+| `pnpm db:generate`   | Generate SQL migration from Drizzle schema changes                                                                                                                                                               |
+| `pnpm db:migrate`    | Apply pending migrations from `packages/db/migrations`                                                                                                                                                           |
+| `pnpm db:studio`     | Browse the database with Drizzle Studio                                                                                                                                                                          |
 
 Note: run `pnpm build` before `pnpm db:generate` — the DB schema imports
 vocabulary constants from `@dip/domain`, which resolves from its built output.

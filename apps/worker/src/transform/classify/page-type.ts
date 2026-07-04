@@ -14,7 +14,10 @@ export interface PageClassification {
  * future AI review) can see WHY a page was classified.
  */
 export function classifyPageType(signals: PageSignals): PageClassification {
-  const scores: Record<Exclude<PageType, "unknown">, { score: number; signals: Array<[string, number]> }> = {
+  const scores: Record<
+    Exclude<PageType, "unknown">,
+    { score: number; signals: Array<[string, number]> }
+  > = {
     product: { score: 0, signals: [] },
     listing: { score: 0, signals: [] },
     non_product: { score: 0, signals: [] },
@@ -47,7 +50,11 @@ export function classifyPageType(signals: PageSignals): PageClassification {
   if (signals.totalLinkCount > 150 && signals.productLinkCount < 5 && !signals.hasJsonLdProduct) {
     add("non_product", "link_heavy_no_product_evidence", 0.25);
   }
-  if (signals.priceTextCount === 0 && !signals.hasJsonLdProduct && !signals.ogType?.includes("product")) {
+  if (
+    signals.priceTextCount === 0 &&
+    !signals.hasJsonLdProduct &&
+    !signals.ogType?.includes("product")
+  ) {
     add("non_product", "no_price_or_product_markup", 0.25);
   }
   if (signals.productLinkCount === 0 && signals.priceTextCount === 0 && !signals.hasJsonLdProduct) {

@@ -1,1 +1,8 @@
-export { loadConfig, getSpacesConfig, type AppConfig, type SpacesConfig } from "./env.js";
+export {
+  loadConfig,
+  getSpacesConfig,
+  getAiConfig,
+  type AppConfig,
+  type SpacesConfig,
+  type AiConfig,
+} from "./env.js";

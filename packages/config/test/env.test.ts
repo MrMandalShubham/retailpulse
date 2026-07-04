@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSpacesConfig, loadConfig } from "../src/env.js";
+import { getAiConfig, getSpacesConfig, loadConfig } from "../src/env.js";
 
 const BASE_ENV = { DATABASE_URL: "postgres://dip:dip@localhost:5432/dip_engine" };
 
@@ -58,6 +58,48 @@ describe("getSpacesConfig", () => {
     delete partial.DO_SPACES_SECRET;
     expect(() => getSpacesConfig(loadConfig(partial))).toThrow(
       /Missing: DO_SPACES_BUCKET, DO_SPACES_SECRET/,
+    );
+  });
+});
+
+describe("getAiConfig", () => {
+  it("defaults to the mock provider with no key required", () => {
+    const ai = getAiConfig(loadConfig(BASE_ENV));
+    expect(ai).toEqual({
+      provider: "mock",
+      model: "mistral-small-latest",
+      apiKey: null,
+      maxItems: 20,
+      timeoutMs: 30_000,
+      maxRetries: 2,
+    });
+  });
+
+  it("returns mistral settings when fully configured", () => {
+    const ai = getAiConfig(
+      loadConfig({
+        ...BASE_ENV,
+        AI_PROVIDER: "mistral",
+        AI_MODEL: "mistral-large-latest",
+        MISTRAL_API_KEY: "key-123",
+        AI_REVIEW_MAX_ITEMS: "5",
+      }),
+    );
+    expect(ai.provider).toBe("mistral");
+    expect(ai.model).toBe("mistral-large-latest");
+    expect(ai.apiKey).toBe("key-123");
+    expect(ai.maxItems).toBe(5);
+  });
+
+  it("fails fast when mistral is selected without an API key", () => {
+    expect(() => getAiConfig(loadConfig({ ...BASE_ENV, AI_PROVIDER: "mistral" }))).toThrow(
+      /MISTRAL_API_KEY/,
+    );
+  });
+
+  it("rejects unknown providers at the schema level", () => {
+    expect(() => loadConfig({ ...BASE_ENV, AI_PROVIDER: "openai" })).toThrow(
+      /Invalid environment configuration/,
     );
   });
 });

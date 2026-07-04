@@ -23,3 +23,6 @@ export {
   normalizationRules,
   transformObservations,
 } from "./transform.js";
+
+// AI review layer (Phase 4) — advisory audit records, controlled rule promotion
+export { aiReviewRuns, aiReviewItems, aiRuleSuggestions } from "./ai-review.js";

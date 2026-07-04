@@ -26,13 +26,24 @@ describe("text helpers", () => {
 
 describe("parsePriceText", () => {
   it("parses symbol currencies with thousand separators", () => {
-    expect(parsePriceText("₩12,900", SYMBOLS)).toEqual({ value: 12900, currency: "KRW", raw: "₩12,900" });
-    expect(parsePriceText("US$ 24.00", SYMBOLS)).toEqual({ value: 24, currency: "USD", raw: "US$ 24.00" });
+    expect(parsePriceText("₩12,900", SYMBOLS)).toEqual({
+      value: 12900,
+      currency: "KRW",
+      raw: "₩12,900",
+    });
+    expect(parsePriceText("US$ 24.00", SYMBOLS)).toEqual({
+      value: 24,
+      currency: "USD",
+      raw: "US$ 24.00",
+    });
   });
 
   it("handles European decimal commas and ISO codes", () => {
     expect(parsePriceText("24,90 €", SYMBOLS)?.value).toBe(24.9);
-    expect(parsePriceText("1.234,56 EUR", SYMBOLS)).toMatchObject({ value: 1234.56, currency: "EUR" });
+    expect(parsePriceText("1.234,56 EUR", SYMBOLS)).toMatchObject({
+      value: 1234.56,
+      currency: "EUR",
+    });
   });
 
   it("rejects garbage and non-positive values", () => {
@@ -43,7 +54,10 @@ describe("parsePriceText", () => {
 
 describe("parseRatingText", () => {
   it("parses x/5, percentages, and plain ratings with counts", () => {
-    expect(parseRatingText("4.6/5 (2,841 reviews)")).toMatchObject({ rating: 4.6, reviewCount: 2841 });
+    expect(parseRatingText("4.6/5 (2,841 reviews)")).toMatchObject({
+      rating: 4.6,
+      reviewCount: 2841,
+    });
     expect(parseRatingText("90%")).toMatchObject({ rating: 4.5 });
     expect(parseRatingText("4.2")).toMatchObject({ rating: 4.2, reviewCount: null });
   });

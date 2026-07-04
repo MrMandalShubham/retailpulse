@@ -4,6 +4,7 @@ import { dbPlugin } from "./plugins/db.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 import { ingestionRoutes } from "./modules/ingestion/ingestion.routes.js";
 import { transformsRoutes } from "./modules/transforms/transforms.routes.js";
+import { aiReviewsRoutes } from "./modules/ai-reviews/ai-reviews.routes.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -25,6 +26,7 @@ export function buildServer(config: AppConfig): FastifyInstance {
   app.register(healthRoutes);
   app.register(ingestionRoutes);
   app.register(transformsRoutes);
+  app.register(aiReviewsRoutes);
 
   // Future modules register here as their phases arrive:
   //   catalog, taxonomy, markets, pricing, reviews (Phase 4 — Query API)

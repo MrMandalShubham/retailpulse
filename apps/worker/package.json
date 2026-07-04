@@ -8,9 +8,11 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "ingest": "tsx src/ingest.ts",
-    "transform": "tsx src/transform/run.ts"
+    "transform": "tsx src/transform/run.ts",
+    "ai-review": "tsx src/ai-review/run.ts"
   },
   "dependencies": {
+    "@dip/ai": "workspace:*",
     "@dip/config": "workspace:*",
     "@dip/db": "workspace:*",
     "@dip/domain": "workspace:*",

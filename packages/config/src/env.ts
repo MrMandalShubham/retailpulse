@@ -32,6 +32,15 @@ const envSchema = z.object({
 
   // Transform worker: per-run cap on raw documents processed.
   TRANSFORM_MAX_DOCUMENTS: z.coerce.number().int().positive().default(100),
+
+  // AI review layer. Default 'mock' — no paid AI call can happen unless the
+  // provider is explicitly configured (approved decision).
+  AI_PROVIDER: z.enum(["mock", "mistral"]).default("mock"),
+  AI_MODEL: z.string().min(1).default("mistral-small-latest"),
+  MISTRAL_API_KEY: z.string().min(1).optional(),
+  AI_REVIEW_MAX_ITEMS: z.coerce.number().int().positive().default(20),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  AI_MAX_RETRIES: z.coerce.number().int().min(0).default(2),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -82,5 +91,34 @@ export function getSpacesConfig(config: AppConfig): SpacesConfig {
     accessKeyId: required.DO_SPACES_KEY as string,
     secretAccessKey: required.DO_SPACES_SECRET as string,
     forcePathStyle: config.DO_SPACES_FORCE_PATH_STYLE,
+  };
+}
+
+/** Fully-resolved AI review settings for processes that require them. */
+export interface AiConfig {
+  provider: "mock" | "mistral";
+  model: string;
+  /** null for providers that need no key (mock). */
+  apiKey: string | null;
+  maxItems: number;
+  timeoutMs: number;
+  maxRetries: number;
+}
+
+/**
+ * Returns AI review settings, failing fast when the selected provider is
+ * missing its credentials (e.g. AI_PROVIDER=mistral without MISTRAL_API_KEY).
+ */
+export function getAiConfig(config: AppConfig): AiConfig {
+  if (config.AI_PROVIDER === "mistral" && !config.MISTRAL_API_KEY) {
+    throw new Error("AI_PROVIDER is 'mistral' but MISTRAL_API_KEY is not set");
+  }
+  return {
+    provider: config.AI_PROVIDER,
+    model: config.AI_MODEL,
+    apiKey: config.MISTRAL_API_KEY ?? null,
+    maxItems: config.AI_REVIEW_MAX_ITEMS,
+    timeoutMs: config.AI_TIMEOUT_MS,
+    maxRetries: config.AI_MAX_RETRIES,
   };
 }

@@ -97,7 +97,12 @@ const testFetch = (url: string) => fetchUrl(url, { timeoutMs: 3_000, retries: 0 
 describe("runIngestionCycle", () => {
   it("stores ok pages in storage and records metadata; failed URLs get error rows", async () => {
     const state = makeFakeRepo([
-      { id: "src-1", slug: "stub-site", name: "Stub", seedUrls: [`${baseUrl}/page`, `${baseUrl}/missing`] },
+      {
+        id: "src-1",
+        slug: "stub-site",
+        name: "Stub",
+        seedUrls: [`${baseUrl}/page`, `${baseUrl}/missing`],
+      },
     ]);
     const storage = makeFakeStorage();
 
@@ -122,7 +127,9 @@ describe("runIngestionCycle", () => {
     expect(okDoc?.contentType).toContain("text/html");
     expect(okDoc?.responseBytes).toBe(Buffer.byteLength(HTML_BODY));
     expect(okDoc?.checksum).toMatch(/^[0-9a-f]{64}$/);
-    expect(okDoc?.storageKey).toMatch(/^raw\/stub-site\/\d{4}-\d{2}-\d{2}\/job-1\/[0-9a-f]{16}\.html$/);
+    expect(okDoc?.storageKey).toMatch(
+      /^raw\/stub-site\/\d{4}-\d{2}-\d{2}\/job-1\/[0-9a-f]{16}\.html$/,
+    );
     // The payload really landed in storage under the recorded key.
     expect(storage.objects.get(okDoc!.storageKey!)).toBeDefined();
 

@@ -3,12 +3,7 @@
  * Master data: stable classification vocabulary used across the platform.
  */
 
-export const PRODUCT_DOMAINS = [
-  "Cosmetics",
-  "Aesthetics",
-  "Nutri_Cosmetics",
-  "Oral_Care",
-] as const;
+export const PRODUCT_DOMAINS = ["Cosmetics", "Aesthetics", "Nutri_Cosmetics", "Oral_Care"] as const;
 export type ProductDomain = (typeof PRODUCT_DOMAINS)[number];
 
 /** Category node (categories). Hierarchy is expressed via parentId (self-reference). */

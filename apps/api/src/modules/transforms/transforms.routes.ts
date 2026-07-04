@@ -70,7 +70,10 @@ export async function transformsRoutes(app: FastifyInstance): Promise<void> {
       validationStatus !== undefined &&
       !VALIDATION_STATUSES.includes(validationStatus as ValidationStatus)
     ) {
-      return badRequest(reply, `validationStatus must be one of: ${VALIDATION_STATUSES.join(", ")}`);
+      return badRequest(
+        reply,
+        `validationStatus must be one of: ${VALIDATION_STATUSES.join(", ")}`,
+      );
     }
     if (sourceId !== undefined && !UUID_PATTERN.test(sourceId)) {
       return badRequest(reply, "sourceId must be a UUID");
@@ -161,6 +164,9 @@ function parseLimit(raw: string | undefined): number | null {
   return Number.isInteger(limit) && limit >= 1 && limit <= 100 ? limit : null;
 }
 
-function badRequest(reply: { status(code: number): { send(body: unknown): unknown } }, error: string) {
+function badRequest(
+  reply: { status(code: number): { send(body: unknown): unknown } },
+  error: string,
+) {
   return reply.status(400).send({ error });
 }

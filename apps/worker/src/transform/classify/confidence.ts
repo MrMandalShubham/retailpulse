@@ -36,7 +36,10 @@ const RECORD_FIELD_WEIGHTS: Record<string, number> = {
 export function resolveField(candidates: FieldCandidate[] | undefined): ResolvedField | null {
   if (!candidates || candidates.length === 0) return null;
 
-  const groups = new Map<string, { value: string; methods: Set<ExtractionMethod>; weight: number }>();
+  const groups = new Map<
+    string,
+    { value: string; methods: Set<ExtractionMethod>; weight: number }
+  >();
   for (const candidate of candidates) {
     const key = fold(candidate.value);
     if (!key) continue;
