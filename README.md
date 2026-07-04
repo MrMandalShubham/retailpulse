@@ -6,12 +6,15 @@ raw layer (ELT), transforms it with AI + deterministic rules, and publishes
 clean records into a normalized 8-table core that powers product comparison,
 dashboards, reports, and a private AI.
 
-**Current status: Phase 2 — raw ingestion foundation.**
-The raw ELT layer works end to end: sources defined in the DB, a manual
-one-shot worker fetches their seed URLs, stores raw payloads in S3-compatible
-object storage (MinIO locally, DigitalOcean Spaces in production), records
-`raw_documents` metadata, and read-only API endpoints expose ingestion status.
-No browser scraping, scheduling/queues, AI extraction, or normalization yet.
+**Current status: Phase 3 — hybrid transform + normalization engine.**
+On top of the Phase 2 raw layer, a local (no-AI) transform pipeline extracts
+product candidates from raw HTML (title/meta/OpenGraph/JSON-LD/DOM heuristics),
+normalizes them with reusable `normalization_rules` (brand aliases, currency
+hints, keyword mappings, fuzzy matching), classifies page types, scores
+field-level confidence, and records unresolved leftovers as
+`transform_observations` for **future** AI escalation. Repeated discoveries
+become rules, so every run needs less AI. No LLM calls, no browser scraping,
+no writes into the canonical 8-table core (promotion is a Phase 4 contract).
 
 ## Repository layout
 
@@ -34,6 +37,12 @@ The normalized V1 core is exactly 8 tables: `products_master` (canonical hub),
 The raw ELT layer (Phase 2) adds `sources`, `crawl_jobs`, and `raw_documents` —
 a strictly separate data flow: nothing in the normalized core references the
 raw layer, and the Phase 2 pipeline never writes to the core.
+
+The staging/transform layer (Phase 3) adds `transform_runs`, `staged_products`,
+`normalization_rules`, and `transform_observations`. Three-layer rule:
+**raw = immutable evidence · staging = regenerable working data · canonical =
+curated truth** (written only via explicit promotion, Phase 4). Staged rows can
+be deleted and regenerated from raw at any time (`--reprocess`).
 
 ## Prerequisites
 
@@ -68,7 +77,10 @@ pnpm bucket:ensure
 # 8. Run one raw ingestion cycle (fetch seed URLs -> MinIO + raw_documents)
 pnpm ingest:run
 
-# 9. Run the API (http://localhost:3000)
+# 9. Run one hybrid transform cycle (raw docs -> staged_products + observations)
+pnpm transform:run
+
+# 10. Run the API (http://localhost:3000)
 pnpm dev:api
 ```
 
@@ -86,6 +98,19 @@ Verify: `GET http://localhost:3000/health` (liveness) and
 The MinIO console at http://localhost:9001 (user `dip-minio`, password
 `dip-minio-secret`) shows the stored raw payloads under `dip-engine-raw/raw/…`.
 
+### Watching the transform layer
+
+- `GET /transforms/runs` and `/transforms/runs/:id` — run history with
+  document counters plus staged/observation counts.
+- `GET /transforms/staged-products?validationStatus=&sourceId=&aiRecommended=` —
+  extracted product candidates with confidence and validation state.
+- `GET /transforms/staged-products/:id` — full candidate detail including
+  field candidates, field confidences, and linked observations.
+- `GET /transforms/observations?status=&type=` — unresolved leftovers queued
+  for future AI review (`unknown_brand`, `conflicting_price`, …).
+- `GET /transforms/rules` — active normalization rules (the system's learned
+  intelligence; rows added here change behavior on the next run, no code).
+
 ## Commands
 
 | Command            | What it does                                          |
@@ -94,6 +119,7 @@ The MinIO console at http://localhost:9001 (user `dip-minio`, password
 | `pnpm dev:api`     | Run the API with hot reload                           |
 | `pnpm dev:worker`  | Run the idle worker skeleton (boot + validate + idle) |
 | `pnpm ingest:run`  | One-shot raw ingestion cycle (Phase 2 manual trigger): reads enabled sources, fetches up to 5 seed URLs each, stores payloads in object storage, records crawl_jobs + raw_documents |
+| `pnpm transform:run` | One-shot hybrid transform cycle (Phase 3, no AI): eligible raw docs → deterministic extraction → rule-based normalization → staged_products + transform_observations. Add `-- --reprocess` to regenerate staging |
 | `pnpm db:seed`     | Idempotent seed of the approved ingestion source      |
 | `pnpm bucket:ensure` | Create the raw-storage bucket (local MinIO helper)  |
 | `pnpm lint`        | ESLint over the whole repo                            |

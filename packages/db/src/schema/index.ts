@@ -15,3 +15,11 @@ export { voicePulseReviews } from "./reviews.js";
 
 // Raw ELT layer (Phase 2)
 export { sources, crawlJobs, rawDocuments } from "./ingestion.js";
+
+// Staging / hybrid transform layer (Phase 3) — regenerable, never canonical
+export {
+  transformRuns,
+  stagedProducts,
+  normalizationRules,
+  transformObservations,
+} from "./transform.js";

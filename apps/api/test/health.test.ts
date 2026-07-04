@@ -11,6 +11,7 @@ const testConfig: AppConfig = {
   DATABASE_URL: "postgres://test:test@localhost:5432/dip_engine_test",
   DO_SPACES_FORCE_PATH_STYLE: false,
   INGEST_FETCH_TIMEOUT_MS: 15_000,
+  TRANSFORM_MAX_DOCUMENTS: 100,
 };
 
 describe("health endpoints", () => {

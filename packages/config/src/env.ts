@@ -29,6 +29,9 @@ const envSchema = z.object({
 
   // Raw ingestion worker.
   INGEST_FETCH_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+
+  // Transform worker: per-run cap on raw documents processed.
+  TRANSFORM_MAX_DOCUMENTS: z.coerce.number().int().positive().default(100),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

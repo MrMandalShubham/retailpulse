@@ -75,11 +75,29 @@ crawl job → fetch ≤5 seed URLs (app-level cap `MAX_SEED_URLS_PER_JOB`, polit
 Approved source: Olive Young Global, seed = approved homepage only — do NOT
 add live URLs without explicit approval.
 
-**Explicitly OUT of scope until instructed (Phase 3+):** Playwright/browser
-scraping, smart crawling (sitemaps, robots.txt, pagination), Redis queues and
-schedulers, AI extraction prompts or LLM integrations, product matching into
-products_master, any writes from raw_documents into the normalized 8-table
-core, review aggregation, price normalization, dashboards/frontends, report
+**Phase 3 (done):** hybrid transform + normalization engine (pre-AI). Staging
+tables `transform_runs`, `staged_products` (incl. `dominant_signal`),
+`normalization_rules` (UNIQUE rule_type+source_scope+match_key, source_scope
+NOT NULL default 'global'), `transform_observations`. Worker pipeline
+(`pnpm transform:run`, `--reprocess` to regenerate): eligible raw HTML docs →
+deterministic extraction (title/meta/OG/JSON-LD/DOM/URL hints + rule-driven
+selector/regex) → local normalization (rules, fuzzy matching vs master data,
+price/rating/currency parsing) → page-type classification with
+dominant_signal → field-level confidences + unresolved_fields →
+validation_status → observations for leftovers (ai_recommended flags future
+AI candidates). Learning loop: promoteObservationToRule() turns findings into
+normalization_rules rows (AI flow is Phase 4, learned_from_ai). Read-only
+monitoring under /transforms/*. Three-layer rule: raw = immutable evidence,
+staging = regenerable, canonical = only via future PromotionService — Phase 3
+has ZERO canonical writes (only reads master data for fuzzy matching).
+staged_product_offers deliberately deferred. Deps added: cheerio,
+fastest-levenshtein (worker only).
+
+**Explicitly OUT of scope until instructed (Phase 4+):** real AI/LLM
+extraction or escalation, embeddings/semantic retrieval, cross-source product
+deduplication, automatic taxonomy creation, promotion writes into the 8-table
+core, Playwright/browser scraping, smart crawling (sitemaps, robots.txt,
+pagination), Redis queues and schedulers, dashboards/frontends, report
 generation, presigned URLs / bucket listing.
 
 ## Conventions

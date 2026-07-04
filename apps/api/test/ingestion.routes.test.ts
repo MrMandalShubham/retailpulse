@@ -14,6 +14,7 @@ function makeConfig(databaseUrl: string): AppConfig {
     DATABASE_URL: databaseUrl,
     DO_SPACES_FORCE_PATH_STYLE: false,
     INGEST_FETCH_TIMEOUT_MS: 15_000,
+    TRANSFORM_MAX_DOCUMENTS: 100,
   };
 }
 

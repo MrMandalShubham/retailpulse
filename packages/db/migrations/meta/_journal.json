@@ -15,6 +15,13 @@
       "when": 1783141273132,
       "tag": "0001_raw_ingestion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783154994749,
+      "tag": "0002_transform_staging",
+      "breakpoints": true
     }
   ]
 }

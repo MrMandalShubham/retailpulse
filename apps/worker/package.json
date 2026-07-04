@@ -7,14 +7,17 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
-    "ingest": "tsx src/ingest.ts"
+    "ingest": "tsx src/ingest.ts",
+    "transform": "tsx src/transform/run.ts"
   },
   "dependencies": {
     "@dip/config": "workspace:*",
     "@dip/db": "workspace:*",
     "@dip/domain": "workspace:*",
     "@dip/storage": "workspace:*",
+    "cheerio": "^1.1.0",
     "dotenv": "^16.5.0",
+    "fastest-levenshtein": "^1.0.16",
     "pino": "^9.7.0"
   },
   "devDependencies": {
