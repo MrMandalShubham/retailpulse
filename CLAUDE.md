@@ -63,11 +63,24 @@ Vitest, docker-compose (Postgres 16). Planning material in `Breakdown/`, `DB/`,
 loader, DB connection, Drizzle schema + initial migration for the 8 tables,
 domain contracts, dev tooling, this file.
 
-**Explicitly OUT of scope until instructed (Phase 2+):** web scraping logic,
-Playwright/Cheerio flows, Redis queues and real ingestion jobs, raw-layer
-tables, DO Spaces/bucket uploads, AI extraction prompts or LLM integrations,
-product matching, review aggregation, price normalization, dashboards/frontends,
-report generation.
+**Phase 2 (done):** raw ingestion foundation. Raw-layer tables `sources`,
+`crawl_jobs`, `raw_documents` (public schema, text + CHECK, CASCADE within the
+raw layer, `sources.market_id` SET NULL). `@dip/storage` S3-compatible adapter
+(DO Spaces in production, MinIO locally via docker-compose — same env
+contract). Worker one-shot pipeline (`pnpm ingest:run`): enabled sources →
+crawl job → fetch ≤5 seed URLs (app-level cap `MAX_SEED_URLS_PER_JOB`, polite
+1s delay, retry/backoff) → payloads to object storage → `raw_documents` rows
+(checksum, response_bytes, http_status) → job status. Read-only monitoring:
+`GET /ingestion/sources`, `/ingestion/jobs`, `/ingestion/jobs/:id/raw-documents`.
+Approved source: Olive Young Global, seed = approved homepage only — do NOT
+add live URLs without explicit approval.
+
+**Explicitly OUT of scope until instructed (Phase 3+):** Playwright/browser
+scraping, smart crawling (sitemaps, robots.txt, pagination), Redis queues and
+schedulers, AI extraction prompts or LLM integrations, product matching into
+products_master, any writes from raw_documents into the normalized 8-table
+core, review aggregation, price normalization, dashboards/frontends, report
+generation, presigned URLs / bucket listing.
 
 ## Conventions
 

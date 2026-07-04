@@ -6,25 +6,34 @@ raw layer (ELT), transforms it with AI + deterministic rules, and publishes
 clean records into a normalized 8-table core that powers product comparison,
 dashboards, reports, and a private AI.
 
-**Current status: Phase 1 — repo foundation and architecture skeleton.**
-No scraping, AI, or ingestion workflows are implemented yet.
+**Current status: Phase 2 — raw ingestion foundation.**
+The raw ELT layer works end to end: sources defined in the DB, a manual
+one-shot worker fetches their seed URLs, stores raw payloads in S3-compatible
+object storage (MinIO locally, DigitalOcean Spaces in production), records
+`raw_documents` metadata, and read-only API endpoints expose ingestion status.
+No browser scraping, scheduling/queues, AI extraction, or normalization yet.
 
 ## Repository layout
 
 ```
 apps/
-  api/          Fastify backend (health checks now; query/ingestion/admin APIs later)
-  worker/       Background worker skeleton (scheduler/job control arrives in Phase 2)
+  api/          Fastify backend (health + raw-ingestion monitoring; query APIs later)
+  worker/       Ingestion worker: one-shot raw fetch pipeline + idle skeleton
 packages/
   config/       @dip/config — zod-validated environment loader (single env source of truth)
   domain/       @dip/domain — shared domain contracts (pure types, no runtime deps)
-  db/           @dip/db — Drizzle schema, pg client, SQL migrations for the V1 core
-services/       Reserved for Python services (scraping Phase 2, AI transform Phase 3)
+  db/           @dip/db — Drizzle schema, pg client, SQL migrations, seed script
+  storage/      @dip/storage — S3-compatible raw object storage (Spaces/MinIO)
+services/       Reserved for Python services (advanced scraping, AI transform — Phase 3+)
 ```
 
 The normalized V1 core is exactly 8 tables: `products_master` (canonical hub),
 `brands`, `categories`, `product_types`, `markets`, `product_markets` (bridge),
 `retail_pulse_prices` and `voice_pulse_reviews` (append-only facts).
+
+The raw ELT layer (Phase 2) adds `sources`, `crawl_jobs`, and `raw_documents` —
+a strictly separate data flow: nothing in the normalized core references the
+raw layer, and the Phase 2 pipeline never writes to the core.
 
 ## Prerequisites
 
@@ -41,7 +50,7 @@ pnpm install
 # 2. Create your local environment file
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 
-# 3. Start local Postgres
+# 3. Start local Postgres + MinIO (S3-compatible stand-in for DO Spaces)
 docker compose up -d
 
 # 4. Build workspace packages (internal packages resolve from dist/)
@@ -50,12 +59,32 @@ pnpm build
 # 5. Apply database migrations
 pnpm db:migrate
 
-# 6. Run the API (http://localhost:3000)
+# 6. Seed the approved ingestion source (Olive Young Global)
+pnpm db:seed
+
+# 7. Create the raw-storage bucket in MinIO (once)
+pnpm bucket:ensure
+
+# 8. Run one raw ingestion cycle (fetch seed URLs -> MinIO + raw_documents)
+pnpm ingest:run
+
+# 9. Run the API (http://localhost:3000)
 pnpm dev:api
 ```
 
 Verify: `GET http://localhost:3000/health` (liveness) and
 `GET http://localhost:3000/health/ready` (database readiness).
+
+### Watching raw ingestion
+
+- `GET /ingestion/sources` — configured sources and their seed URLs.
+- `GET /ingestion/jobs?sourceId=&limit=` — recent crawl jobs with status,
+  timing, and `rawDocumentCount` per job.
+- `GET /ingestion/jobs/:id/raw-documents` — every fetched URL of a job with
+  HTTP status, storage key, checksum, and size.
+
+The MinIO console at http://localhost:9001 (user `dip-minio`, password
+`dip-minio-secret`) shows the stored raw payloads under `dip-engine-raw/raw/…`.
 
 ## Commands
 
@@ -63,10 +92,13 @@ Verify: `GET http://localhost:3000/health` (liveness) and
 | ------------------ | ----------------------------------------------------- |
 | `pnpm build`       | Build all packages/apps (topological order)           |
 | `pnpm dev:api`     | Run the API with hot reload                           |
-| `pnpm dev:worker`  | Run the worker skeleton with hot reload               |
+| `pnpm dev:worker`  | Run the idle worker skeleton (boot + validate + idle) |
+| `pnpm ingest:run`  | One-shot raw ingestion cycle (Phase 2 manual trigger): reads enabled sources, fetches up to 5 seed URLs each, stores payloads in object storage, records crawl_jobs + raw_documents |
+| `pnpm db:seed`     | Idempotent seed of the approved ingestion source      |
+| `pnpm bucket:ensure` | Create the raw-storage bucket (local MinIO helper)  |
 | `pnpm lint`        | ESLint over the whole repo                            |
 | `pnpm format`      | Prettier write                                        |
-| `pnpm test`        | Vitest (no database required)                         |
+| `pnpm test`        | Vitest — DB-independent tests always run; integration tests against a migrated DB run when `TEST_DATABASE_URL` is set |
 | `pnpm db:generate` | Generate SQL migration from Drizzle schema changes    |
 | `pnpm db:migrate`  | Apply pending migrations from `packages/db/migrations`|
 | `pnpm db:studio`   | Browse the database with Drizzle Studio               |

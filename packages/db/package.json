@@ -13,9 +13,11 @@
     "build": "tsc -p tsconfig.json",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
-    "studio": "drizzle-kit studio"
+    "studio": "drizzle-kit studio",
+    "seed": "tsx src/seed/seed.ts"
   },
   "dependencies": {
+    "@dip/config": "workspace:*",
     "@dip/domain": "workspace:*",
     "drizzle-orm": "^0.44.0",
     "pg": "^8.16.0"
@@ -25,6 +27,7 @@
     "@types/pg": "^8.15.0",
     "dotenv": "^16.5.0",
     "drizzle-kit": "^0.31.0",
+    "tsx": "^4.20.0",
     "typescript": "^5.8.0"
   }
 }

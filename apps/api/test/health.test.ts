@@ -9,6 +9,8 @@ const testConfig: AppConfig = {
   API_HOST: "127.0.0.1",
   // The pg pool connects lazily, so liveness tests need no running database.
   DATABASE_URL: "postgres://test:test@localhost:5432/dip_engine_test",
+  DO_SPACES_FORCE_PATH_STYLE: false,
+  INGEST_FETCH_TIMEOUT_MS: 15_000,
 };
 
 describe("health endpoints", () => {

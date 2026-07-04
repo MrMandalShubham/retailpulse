@@ -16,7 +16,10 @@
     "test": "vitest run",
     "db:generate": "pnpm --filter @dip/db generate",
     "db:migrate": "pnpm --filter @dip/db migrate",
-    "db:studio": "pnpm --filter @dip/db studio"
+    "db:seed": "pnpm --filter @dip/db seed",
+    "db:studio": "pnpm --filter @dip/db studio",
+    "bucket:ensure": "pnpm --filter @dip/storage ensure-bucket",
+    "ingest:run": "pnpm --filter @dip/worker ingest"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",

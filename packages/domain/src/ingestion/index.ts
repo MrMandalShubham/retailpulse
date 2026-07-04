@@ -1,39 +1,73 @@
 /**
- * Ingestion domain — contracts for the scraping/collection side of the platform.
- * Phase 1 defines the shared vocabulary only. Implementations (source registry,
- * scheduler, Redis queue, Python scraper workers) arrive in Phase 2.
+ * Ingestion domain — the raw ELT collection layer: sources, crawl jobs, and
+ * raw documents. Phase 2 implements "fetch → store raw → record metadata";
+ * scheduling/queueing (Redis) and browser rendering arrive in later phases.
  */
 
-export const CRAWL_JOB_STATUSES = [
-  "pending",
-  "running",
-  "succeeded",
-  "failed",
-  "dead_letter",
-] as const;
+export const SOURCE_TYPES = ["website", "marketplace", "api", "review_platform"] as const;
+export type SourceType = (typeof SOURCE_TYPES)[number];
+
+export const CRAWL_JOB_STATUSES = ["pending", "running", "succeeded", "failed"] as const;
 export type CrawlJobStatus = (typeof CRAWL_JOB_STATUSES)[number];
 
-/** Configuration for a scrape source (a website/marketplace/review platform). */
-export interface SourceConfig {
+export const RAW_DOCUMENT_STATUSES = ["ok", "error", "skipped"] as const;
+export type RawDocumentStatus = (typeof RAW_DOCUMENT_STATUSES)[number];
+
+/**
+ * Max seed URLs fetched per source per crawl job. Application-level rule
+ * (approved decision) — deliberately NOT a DB constraint.
+ */
+export const MAX_SEED_URLS_PER_JOB = 5;
+
+/** External website / API we ingest from (sources). */
+export interface Source {
   id: string;
   name: string;
+  slug: string;
   baseUrl: string;
-  /** Whether pages need a headless browser (dynamic) or plain HTTP (static). */
-  rendering: "static" | "dynamic";
-  /** Requests per minute allowed against this source. */
-  rateLimitRpm: number;
+  sourceType: SourceType;
+  marketId: string | null;
   enabled: boolean;
+  /** URLs fetched per crawl in Phase 2; capped by MAX_SEED_URLS_PER_JOB. */
+  seedUrls: string[];
+  scrapeStrategy: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-/** A unit of scraping work produced by the scheduler and consumed by workers. */
+/** One ingestion run for a source (crawl_jobs). */
 export interface CrawlJob {
   id: string;
   sourceId: string;
-  url: string;
   status: CrawlJobStatus;
-  attempts: number;
+  attemptNumber: number;
   scheduledAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// TODO(Phase 2): source registry CRUD contracts, scheduler cadence types, and the
-// queue payload schema shared with the Python scraper workers.
+/** One fetched URL within a crawl job (raw_documents). */
+export interface RawDocument {
+  id: string;
+  crawlJobId: string;
+  sourceId: string;
+  url: string;
+  contentType: string | null;
+  /** Object-storage key of the stored payload; null when status is error/skipped. */
+  storageKey: string | null;
+  /** sha256 hex of the payload — enables change detection/dedup in Phase 3. */
+  checksum: string | null;
+  status: RawDocumentStatus;
+  httpStatus: number | null;
+  responseBytes: number | null;
+  errorMessage: string | null;
+  fetchedAt: string;
+  createdAt: string;
+}
+
+// TODO(Phase 3): extraction hand-off contracts (raw_document -> staging JSON)
+// are defined here when the AI transform layer is built.
