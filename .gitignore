@@ -1,0 +1,26 @@
+# Dependencies / build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Pre-repo planning material (local only, not part of the codebase).
+# Anchored to the repo root: on Windows, git matches ignore patterns
+# case-insensitively, and an unanchored "DB/" would swallow packages/db/.
+/Breakdown/
+/DB/
+/Docs/

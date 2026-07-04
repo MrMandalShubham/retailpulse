@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dip-engine-postgres
+    environment:
+      POSTGRES_USER: dip
+      POSTGRES_PASSWORD: dip
+      POSTGRES_DB: dip_engine
+    ports:
+      - "5432:5432"
+    volumes:
+      - dip_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dip -d dip_engine"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  dip_pgdata:
