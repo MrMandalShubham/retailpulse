@@ -20,6 +20,7 @@ function makeConfig(databaseUrl: string): AppConfig {
     AI_REVIEW_MAX_ITEMS: 20,
     AI_TIMEOUT_MS: 30_000,
     AI_MAX_RETRIES: 2,
+    PROMOTION_MAX_ITEMS: 50,
   };
 }
 

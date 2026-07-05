@@ -1,10 +1,14 @@
+import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance } from "fastify";
+import fastifyStatic from "@fastify/static";
 import type { AppConfig } from "@dip/config";
 import { dbPlugin } from "./plugins/db.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 import { ingestionRoutes } from "./modules/ingestion/ingestion.routes.js";
 import { transformsRoutes } from "./modules/transforms/transforms.routes.js";
 import { aiReviewsRoutes } from "./modules/ai-reviews/ai-reviews.routes.js";
+import { productsRoutes } from "./modules/products/products.routes.js";
+import { promotionRoutes } from "./modules/promotion/promotion.routes.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -27,10 +31,16 @@ export function buildServer(config: AppConfig): FastifyInstance {
   app.register(ingestionRoutes);
   app.register(transformsRoutes);
   app.register(aiReviewsRoutes);
+  app.register(productsRoutes);
+  app.register(promotionRoutes);
 
-  // Future modules register here as their phases arrive:
-  //   catalog, taxonomy, markets, pricing, reviews (Phase 4 — Query API)
-  // See src/modules/* for the placeholder boundaries.
+  // Internal operator dashboard (Phase 5 shell): a single static page over the
+  // JSON APIs — no framework, no build step. Located in apps/api/public/.
+  app.register(fastifyStatic, {
+    root: fileURLToPath(new URL("../public", import.meta.url)),
+    serve: false,
+  });
+  app.get("/dashboard", (_request, reply) => reply.sendFile("dashboard.html"));
 
   return app;
 }

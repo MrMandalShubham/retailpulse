@@ -76,10 +76,47 @@ export const METHOD_WEIGHTS: Record<ExtractionMethod, number> = {
 
 /** A field with best confidence below this lands in unresolved_fields. */
 export const UNRESOLVED_CONFIDENCE_THRESHOLD = 0.6;
-/** Minimum record confidence for canonical promotion eligibility (Phase 4). */
+/** Minimum record confidence for canonical promotion eligibility. */
 export const PROMOTION_CONFIDENCE_THRESHOLD = 0.8;
 /** Minimum normalized string similarity for a fuzzy brand/category match. */
 export const FUZZY_MATCH_THRESHOLD = 0.85;
+/** Max total unresolved fields a staged product may carry and still promote. */
+export const MAX_UNRESOLVED_FIELDS_FOR_PROMOTION = 2;
+/** Same-brand name similarity at/above which a canonical match is accepted. */
+export const AUTO_MATCH_SIMILARITY_THRESHOLD = 0.9;
+/** Similarity band floor: [floor, auto) is AMBIGUOUS — the record stays staged. */
+export const AMBIGUOUS_SIMILARITY_FLOOR = 0.75;
+
+// ---------------------------------------------------------------------------
+// Canonical promotion vocabularies (Phase 5)
+// ---------------------------------------------------------------------------
+
+export const PROMOTION_RUN_STATUSES = ["pending", "running", "succeeded", "failed"] as const;
+export type PromotionRunStatus = (typeof PROMOTION_RUN_STATUSES)[number];
+
+export const PROMOTION_TRIGGER_TYPES = ["batch", "single"] as const;
+export type PromotionTriggerType = (typeof PROMOTION_TRIGGER_TYPES)[number];
+
+export const PROMOTION_DECISIONS = [
+  "promoted_new",
+  "matched_existing",
+  "skipped_ineligible",
+  "skipped_ambiguous",
+  "rejected",
+  "failed",
+] as const;
+export type PromotionDecision = (typeof PROMOTION_DECISIONS)[number];
+
+export const MATCH_STRATEGIES = [
+  "source_url",
+  "exact_brand_name",
+  "fuzzy_brand_name",
+  "new_product",
+] as const;
+export type MatchStrategy = (typeof MATCH_STRATEGIES)[number];
+
+export const PRODUCT_MEDIA_TYPES = ["image", "video"] as const;
+export type ProductMediaType = (typeof PRODUCT_MEDIA_TYPES)[number];
 
 /** One transform execution (transform_runs). */
 export interface TransformRun {
@@ -215,6 +252,11 @@ export function evaluatePromotionEligibility(
     if (input.unresolvedFields.includes(critical)) {
       reasons.push(`critical field '${critical}' is unresolved`);
     }
+  }
+  if (input.unresolvedFields.length > MAX_UNRESOLVED_FIELDS_FOR_PROMOTION) {
+    reasons.push(
+      `${input.unresolvedFields.length} unresolved fields exceed the limit of ${MAX_UNRESOLVED_FIELDS_FOR_PROMOTION}`,
+    );
   }
   return { eligible: reasons.length === 0, reasons };
 }

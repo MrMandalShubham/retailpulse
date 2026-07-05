@@ -12,6 +12,8 @@
     "@dip/config": "workspace:*",
     "@dip/db": "workspace:*",
     "@dip/domain": "workspace:*",
+    "@dip/promotion": "workspace:*",
+    "@fastify/static": "^8.0.0",
     "dotenv": "^16.5.0",
     "fastify": "^5.4.0",
     "fastify-plugin": "^5.0.0"

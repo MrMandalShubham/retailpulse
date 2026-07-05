@@ -13,6 +13,9 @@ export {
   inArray,
   count,
   isNotNull,
+  isNull,
   ilike,
+  gte,
+  lte,
   notExists,
 } from "drizzle-orm";

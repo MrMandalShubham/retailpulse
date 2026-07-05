@@ -41,6 +41,9 @@ const envSchema = z.object({
   AI_REVIEW_MAX_ITEMS: z.coerce.number().int().positive().default(20),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   AI_MAX_RETRIES: z.coerce.number().int().min(0).default(2),
+
+  // Canonical promotion: per-batch cap on staged products considered.
+  PROMOTION_MAX_ITEMS: z.coerce.number().int().positive().default(50),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

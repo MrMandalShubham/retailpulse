@@ -6,7 +6,17 @@ raw layer (ELT), transforms it with AI + deterministic rules, and publishes
 clean records into a normalized 8-table core that powers product comparison,
 dashboards, reports, and a private AI.
 
-**Current status: Phase 4 — AI-assisted review and selective escalation.**
+**Current status: Phase 5 — canonical promotion and product experience layer.**
+`@dip/promotion` is the single gateway that turns validated staging into
+canonical truth: confidence/validation-gated, transactional, idempotent
+(normalized `source_url` uniqueness), dedup-aware (exact + fuzzy within brand;
+ambiguity stays staged), and fully audited (`promotion_runs`/`promotion_items`
+with operator notes). The canonical catalog is searchable (Postgres FTS over
+`product_search_documents`) through `/products*` endpoints, promotion is
+operated through `/promotion*`, and a minimal internal dashboard lives at
+`/dashboard`. Fact tables (prices/reviews) and markets remain untouched.
+
+Previous phase summary (Phase 4 — AI-assisted review and selective escalation):
 A provider-agnostic AI layer reviews ONLY the unresolved leftovers from the
 Phase 3 transform (gated: `ai_recommended` staged products and open
 field-level observations). Business logic talks to internal review contracts;
@@ -38,6 +48,7 @@ packages/
   db/           @dip/db — Drizzle schema, pg client, SQL migrations, seed script
   storage/      @dip/storage — S3-compatible raw object storage (Spaces/MinIO)
   ai/           @dip/ai — provider-agnostic AI review (prompt contract, Mistral + mock adapters)
+  promotion/    @dip/promotion — the ONLY canonical write gateway (matching, dedup, audit)
 services/       Reserved for Python services (advanced scraping, AI transform — Phase 3+)
 ```
 
@@ -94,7 +105,10 @@ pnpm transform:run
 # 10. Run one AI review cycle over unresolved leftovers (mock provider by default)
 pnpm ai-review:run
 
-# 11. Run the API (http://localhost:3000)
+# 11. Promote eligible staged products into the canonical catalog
+pnpm promote:run
+
+# 12. Run the API (http://localhost:3000) — operator dashboard at /dashboard
 pnpm dev:api
 ```
 
@@ -142,6 +156,21 @@ Provider selection is config-only: `AI_PROVIDER=mock` (default, free) or
 `AI_PROVIDER=mistral` + `MISTRAL_API_KEY`. Swapping vendors later means one
 new adapter file in `packages/ai/src/providers/` — no business-logic changes.
 
+### Canonical catalog & promotion
+
+- `GET /products` — canonical list with filters (brand, category, source,
+  price/rating ranges), sorting, pagination.
+- `GET /products/search?q=` — Postgres full-text search with the same filters.
+- `GET /products/:id` (+ `/sources`, `/media`, `/history`) — detail with
+  provenance, media references, and the complete promotion audit trail.
+- `GET /products/stats` — catalog totals and breakdowns.
+- `GET /promotion/queue` — staged candidates with per-record eligibility.
+- `POST /promotion/run` · `POST /promotion/items/:id/promote` ·
+  `POST /promotion/items/:id/reject` (operator reason required) — the only
+  HTTP surface that can cause canonical writes, always via `@dip/promotion`.
+- `GET /dashboard` — internal operator dashboard (stats, product list/detail,
+  promotion queue with promote/reject, run history).
+
 ## Commands
 
 | Command              | What it does                                                                                                                                                                                                     |
@@ -152,6 +181,7 @@ new adapter file in `packages/ai/src/providers/` — no business-logic changes.
 | `pnpm ingest:run`    | One-shot raw ingestion cycle (Phase 2 manual trigger): reads enabled sources, fetches up to 5 seed URLs each, stores payloads in object storage, records crawl_jobs + raw_documents                              |
 | `pnpm transform:run` | One-shot hybrid transform cycle (Phase 3, no AI): eligible raw docs → deterministic extraction → rule-based normalization → staged_products + transform_observations. Add `-- --reprocess` to regenerate staging |
 | `pnpm ai-review:run` | One-shot AI review cycle (Phase 4): gated unresolved leftovers → configured provider (`AI_PROVIDER`) → ai_review_items + ai_rule_suggestions. Advisory only; rules change only via the approval endpoint         |
+| `pnpm promote:run`   | One-shot canonical promotion batch (Phase 5): eligible staged products -> @dip/promotion gateway -> canonical tables + provenance + search docs, fully audited                                                   |
 | `pnpm db:seed`       | Idempotent seed of the approved ingestion source                                                                                                                                                                 |
 | `pnpm bucket:ensure` | Create the raw-storage bucket (local MinIO helper)                                                                                                                                                               |
 | `pnpm lint`          | ESLint over the whole repo                                                                                                                                                                                       |

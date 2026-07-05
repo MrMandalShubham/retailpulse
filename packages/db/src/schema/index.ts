@@ -26,3 +26,12 @@ export {
 
 // AI review layer (Phase 4) — advisory audit records, controlled rule promotion
 export { aiReviewRuns, aiReviewItems, aiRuleSuggestions } from "./ai-review.js";
+
+// Canonical promotion layer (Phase 5) — audit trail, provenance, media, search
+export {
+  promotionRuns,
+  promotionItems,
+  productSources,
+  productMedia,
+  productSearchDocuments,
+} from "./promotion.js";

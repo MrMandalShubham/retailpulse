@@ -34,6 +34,15 @@ describe("evaluatePromotionEligibility", () => {
     expect(result.reasons).toHaveLength(3);
   });
 
+  it("rejects records with too many unresolved fields", () => {
+    const result = evaluatePromotionEligibility({
+      ...ELIGIBLE_INPUT,
+      unresolvedFields: ["category", "product_type", "image"],
+    });
+    expect(result.eligible).toBe(false);
+    expect(result.reasons.join(" ")).toContain("exceed the limit");
+  });
+
   it("rejects needs_review records regardless of confidence", () => {
     const result = evaluatePromotionEligibility({
       ...ELIGIBLE_INPUT,

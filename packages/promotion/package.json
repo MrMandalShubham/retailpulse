@@ -1,0 +1,24 @@
+{
+  "name": "@dip/promotion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@dip/db": "workspace:*",
+    "@dip/domain": "workspace:*",
+    "fastest-levenshtein": "^1.0.16"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}

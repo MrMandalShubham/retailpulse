@@ -9,11 +9,13 @@
     "start": "node dist/main.js",
     "ingest": "tsx src/ingest.ts",
     "transform": "tsx src/transform/run.ts",
-    "ai-review": "tsx src/ai-review/run.ts"
+    "ai-review": "tsx src/ai-review/run.ts",
+    "promote": "tsx src/promote.ts"
   },
   "dependencies": {
     "@dip/ai": "workspace:*",
     "@dip/config": "workspace:*",
+    "@dip/promotion": "workspace:*",
     "@dip/db": "workspace:*",
     "@dip/domain": "workspace:*",
     "@dip/storage": "workspace:*",

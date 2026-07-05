@@ -114,12 +114,29 @@ promoted_to_rule; duplicates → 409) or :id/reject. Read endpoints under
 /ai-reviews/*. Vendor wire formats must NEVER leak outside
 packages/ai/src/providers/. Canonical core still has ZERO automated writes.
 
-**Explicitly OUT of scope until instructed (Phase 5+):** automatic canonical
-product promotion, embeddings/semantic retrieval, chat/end-user AI features,
-autonomous taxonomy generation, human moderation UI, cross-source product
-deduplication, Playwright/browser scraping, smart crawling (sitemaps,
-robots.txt, pagination), Redis queues and schedulers, dashboards/frontends,
-report generation, presigned URLs / bucket listing.
+**Phase 5 (done):** canonical promotion + product experience layer. Tables
+`promotion_runs`, `promotion_items` (incl. `operator_note`), `product_sources`
+(NORMALIZED source_url UNIQUE — idempotency anchor), `product_media`,
+`product_search_documents` (tsvector + GIN + denormalized filter columns).
+`@dip/promotion` is the ONLY canonical write gateway: eligibility gates
+(valid + confidence ≥0.8 + product page + name/brand resolved + ≤2 unresolved),
+per-item transactions, matching order source_url → exact_brand_name →
+fuzzy_brand_name ≥0.9 → ambiguous [0.75,0.9) STAYS STAGED → new_product.
+Matched products get fill-if-null enrichment only. Find-or-create master data
+(brands/categories/product_types, low-trust name+slug). URL normalization:
+lowercase host, strip tracking params/fragments/default ports, sort params,
+trim trailing slash. Reject = audit row + operator_note (required) + staged
+validation_status→invalid. Fact tables + markets NOT written. Endpoints:
+/products* (list/search FTS/detail/sources/media/history/stats), /promotion*
+(runs/queue/run/promote/reject), /dashboard (static single-file operator UI,
+apps/api/public/). `pnpm promote:run`. Deps added: @fastify/static.
+
+**Explicitly OUT of scope until instructed (Phase 6+):** public consumer
+website, embeddings/semantic/vector search, chat/end-user AI features,
+recommendation engines, retail_pulse_prices / voice_pulse_reviews fact
+writes, market mapping / product_markets population, cross-source product
+dedup beyond the single-brand matcher, Playwright/browser scraping, smart
+crawling, Redis queues and schedulers, report generation, presigned URLs.
 
 ## Conventions
 
