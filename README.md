@@ -6,7 +6,19 @@ raw layer (ELT), transforms it with AI + deterministic rules, and publishes
 clean records into a normalized 8-table core that powers product comparison,
 dashboards, reports, and a private AI.
 
-**Current status: Phase 5 — canonical promotion and product experience layer.**
+**Current status: Phase 6 — fact layer and market mapping.**
+The catalog is now measurable over time: append-only `product_price_facts` /
+`product_rating_facts` (observation grain, full provenance, `market_id`
+nullable = honestly unknown), honest source→market mapping in
+`source_markets`, and the first gated writes to the V1 core fact tables
+(`retail_pulse_prices` weekly, `voice_pulse_reviews` monthly — only when the
+market is known; first observation per period wins). `XG` ("Global
+(Cross-border)") is an internal user-assigned code for genuinely global
+storefronts — never presented as a country. Freshness/coverage/source health
+are computed live at `/freshness/stats`, `/coverage/stats`,
+`/sources/:id/health`. Run with `pnpm facts:run`.
+
+Previous phase summary (Phase 5 — canonical promotion and product experience layer):
 `@dip/promotion` is the single gateway that turns validated staging into
 canonical truth: confidence/validation-gated, transactional, idempotent
 (normalized `source_url` uniqueness), dedup-aware (exact + fuzzy within brand;
@@ -14,7 +26,7 @@ ambiguity stays staged), and fully audited (`promotion_runs`/`promotion_items`
 with operator notes). The canonical catalog is searchable (Postgres FTS over
 `product_search_documents`) through `/products*` endpoints, promotion is
 operated through `/promotion*`, and a minimal internal dashboard lives at
-`/dashboard`. Fact tables (prices/reviews) and markets remain untouched.
+`/dashboard`.
 
 Previous phase summary (Phase 4 — AI-assisted review and selective escalation):
 A provider-agnostic AI layer reviews ONLY the unresolved leftovers from the

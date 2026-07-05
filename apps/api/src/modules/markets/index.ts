@@ -1,6 +1,5 @@
 /**
- * Markets module boundary — market master data and product availability
- * endpoints (markets, product_markets).
- * TODO(Phase 4): implement Query API routes and register them in server.ts.
+ * Markets module — market master data plus honest source mappings
+ * (source_markets). XG is always served with its non-country disclaimer.
  */
-export {};
+export { marketsRoutes } from "./markets.routes.js";

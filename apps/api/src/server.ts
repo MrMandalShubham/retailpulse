@@ -9,6 +9,9 @@ import { transformsRoutes } from "./modules/transforms/transforms.routes.js";
 import { aiReviewsRoutes } from "./modules/ai-reviews/ai-reviews.routes.js";
 import { productsRoutes } from "./modules/products/products.routes.js";
 import { promotionRoutes } from "./modules/promotion/promotion.routes.js";
+import { factsRoutes } from "./modules/facts/facts.routes.js";
+import { marketsRoutes } from "./modules/markets/markets.routes.js";
+import { insightsRoutes } from "./modules/insights/insights.routes.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -33,6 +36,9 @@ export function buildServer(config: AppConfig): FastifyInstance {
   app.register(aiReviewsRoutes);
   app.register(productsRoutes);
   app.register(promotionRoutes);
+  app.register(factsRoutes);
+  app.register(marketsRoutes);
+  app.register(insightsRoutes);
 
   // Internal operator dashboard (Phase 5 shell): a single static page over the
   // JSON APIs — no framework, no build step. Located in apps/api/public/.

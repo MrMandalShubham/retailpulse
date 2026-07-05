@@ -10,7 +10,8 @@
     "ingest": "tsx src/ingest.ts",
     "transform": "tsx src/transform/run.ts",
     "ai-review": "tsx src/ai-review/run.ts",
-    "promote": "tsx src/promote.ts"
+    "promote": "tsx src/promote.ts",
+    "facts": "tsx src/facts/run.ts"
   },
   "dependencies": {
     "@dip/ai": "workspace:*",

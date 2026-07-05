@@ -35,3 +35,6 @@ export {
   productMedia,
   productSearchDocuments,
 } from "./promotion.js";
+
+// Fact + market-mapping layer (Phase 6) — append-only history, honest mapping
+export { sourceMarkets, factRuns, productPriceFacts, productRatingFacts } from "./facts.js";

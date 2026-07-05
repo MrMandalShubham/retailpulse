@@ -28,3 +28,31 @@ export interface ProductMarket {
   localName: string | null;
   localSku: string | null;
 }
+
+/**
+ * Source→market mapping confidence (source_markets, Phase 6).
+ * Mappings are created ONLY by seed/operator — never inferred by pipelines.
+ * 'confirmed' mappings may create product_markets rows; 'inferred' may only
+ * stamp market_id onto observation facts.
+ */
+export const SOURCE_MARKET_CONFIDENCES = ["confirmed", "inferred"] as const;
+export type SourceMarketConfidence = (typeof SOURCE_MARKET_CONFIDENCES)[number];
+
+/**
+ * Internal cross-border market code (markets.code). 'XG' sits in the ISO 3166
+ * user-assigned range — it is NOT a real ISO country code and must never be
+ * presented as a country. It exists for sources that genuinely operate one
+ * global cross-border storefront (e.g. Olive Young Global).
+ */
+export const CROSS_BORDER_MARKET_CODE = "XG";
+
+/** Source→market mapping record (source_markets). */
+export interface SourceMarket {
+  id: string;
+  sourceId: string;
+  marketId: string;
+  confidence: SourceMarketConfidence;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

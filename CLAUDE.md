@@ -131,12 +131,34 @@ validation_status→invalid. Fact tables + markets NOT written. Endpoints:
 (runs/queue/run/promote/reject), /dashboard (static single-file operator UI,
 apps/api/public/). `pnpm promote:run`. Deps added: @fastify/static.
 
-**Explicitly OUT of scope until instructed (Phase 6+):** public consumer
+**Phase 6 (done):** fact layer + market mapping. Tables `source_markets`
+(UNIQUE source+market, confidence confirmed/inferred — created ONLY by
+seed/operator, never inferred by pipelines), `fact_runs`,
+`product_price_facts`, `product_rating_facts` (append-only observation grain;
+`fact_type` observed/derived — Phase 6 writes 'observed' only; market_id
+nullable = honestly unknown; dedup anchor UNIQUE(product_id, source_url,
+observed_at) with observed_at = raw_documents.fetched_at and NORMALIZED
+source_url; price_currency always uppercased). Evidence spine =
+promotion_items joined staged payloads + raw fetch times. The fact pipeline
+(`pnpm facts:run`) is the FIRST AND ONLY writer of retail_pulse_prices
+(retailer = source slug, week_ending = Sunday) and voice_pulse_reviews
+(platform = source slug, period_month) — ONLY when market is known; first
+observation per period wins, later same-period observations stay at
+observation grain. product_markets upserted (Active) only on 'confirmed'
+mappings. Market 'Global (Cross-border)' code XG = INTERNAL user-assigned
+cross-border code (ISO user-assigned range), NEVER presented as a country
+(API attaches disclaimer). Freshness/coverage/source-health are computed
+queries (no summary tables; STALE_FACT_DAYS=30). Endpoints: /facts/_,
+/markets_, /freshness/stats, /coverage/stats, /sources/:id/health|coverage;
+dashboard gained a Facts & Freshness panel + fact timelines in product detail.
+
+**Explicitly OUT of scope until instructed (Phase 7+):** public consumer
 website, embeddings/semantic/vector search, chat/end-user AI features,
-recommendation engines, retail_pulse_prices / voice_pulse_reviews fact
-writes, market mapping / product_markets population, cross-source product
-dedup beyond the single-brand matcher, Playwright/browser scraping, smart
-crawling, Redis queues and schedulers, report generation, presigned URLs.
+recommendation engines, currency conversion / 'derived' facts, real
+country-market mappings beyond XG, fact summary tables/materialized views,
+cross-source product dedup beyond the single-brand matcher, Playwright/
+browser scraping, smart crawling, Redis queues and schedulers, report
+generation, presigned URLs.
 
 ## Conventions
 

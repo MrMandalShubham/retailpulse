@@ -44,6 +44,9 @@ const envSchema = z.object({
 
   // Canonical promotion: per-batch cap on staged products considered.
   PROMOTION_MAX_ITEMS: z.coerce.number().int().positive().default(50),
+
+  // Fact pipeline: per-run cap on evidence rows considered.
+  FACTS_MAX_PRODUCTS: z.coerce.number().int().positive().default(500),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

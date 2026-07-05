@@ -6,9 +6,12 @@
  */
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
+import { eq } from "drizzle-orm";
 import { loadConfig } from "@dip/config";
 import { createDb } from "../client.js";
+import { sourceMarkets } from "../schema/facts.js";
 import { sources } from "../schema/ingestion.js";
+import { markets } from "../schema/markets.js";
 import { normalizationRules } from "../schema/transform.js";
 
 loadEnv({ path: fileURLToPath(new URL("../../../../.env", import.meta.url)) });
@@ -108,5 +111,42 @@ const inserted = await db
   })
   .returning({ id: normalizationRules.id });
 console.log(`seeded ${inserted.length} new normalization rules (${STARTER_RULES.length} defined)`);
+
+// ---------------------------------------------------------------------------
+// Phase 6 market mapping (approved).
+// IMPORTANT: 'XG' is an INTERNAL, user-assigned cross-border market code from
+// the ISO 3166 user-assigned range. It is NOT a real ISO country code and must
+// never be presented as a country. It exists because Olive Young Global
+// genuinely operates ONE global cross-border storefront (USD pricing,
+// worldwide shipping). Real country markets get real ISO codes when mapped.
+// ---------------------------------------------------------------------------
+await db
+  .insert(markets)
+  .values({
+    name: "Global (Cross-border)",
+    code: "XG",
+    region: "Global",
+    regulatoryAuthority: null,
+  })
+  .onConflictDoNothing({ target: markets.code });
+
+const [xgMarket] = await db.select({ id: markets.id }).from(markets).where(eq(markets.code, "XG"));
+const [oliveYoung] = await db
+  .select({ id: sources.id })
+  .from(sources)
+  .where(eq(sources.slug, OLIVE_YOUNG_GLOBAL.slug));
+if (xgMarket && oliveYoung) {
+  await db
+    .insert(sourceMarkets)
+    .values({
+      sourceId: oliveYoung.id,
+      marketId: xgMarket.id,
+      confidence: "confirmed",
+      notes:
+        "Olive Young Global is a single global cross-border storefront (USD pricing, worldwide shipping). XG is an internal user-assigned code, not a country.",
+    })
+    .onConflictDoNothing({ target: [sourceMarkets.sourceId, sourceMarkets.marketId] });
+  console.log("seeded market 'Global (Cross-border)' (XG) + oliveyoung-global mapping");
+}
 
 await pool.end();

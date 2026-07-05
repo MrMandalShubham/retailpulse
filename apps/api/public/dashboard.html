@@ -212,6 +212,12 @@
         <div id="runs"><span class="muted">loading…</span></div>
       </div>
 
+      <div class="panel wide">
+        <h2>Facts &amp; freshness</h2>
+        <div class="stats" id="factStats"><span class="muted">loading…</span></div>
+        <div style="margin-top: 12px" id="marketsPanel"><span class="muted">loading…</span></div>
+      </div>
+
       <div class="panel wide" id="detailPanel" style="display: none">
         <h2>Product detail</h2>
         <pre id="detail"></pre>
@@ -302,17 +308,62 @@
 
       async function showDetail(id) {
         try {
-          const detail = await api("/products/" + id);
-          const history = await api("/products/" + id + "/history");
+          const [detail, history, prices, ratings] = await Promise.all([
+            api("/products/" + id),
+            api("/products/" + id + "/history"),
+            api("/facts/prices/" + id),
+            api("/facts/ratings/" + id),
+          ]);
           $("detailPanel").style.display = "block";
           $("detail").textContent = JSON.stringify(
-            { ...detail, history: history.history },
+            {
+              ...detail,
+              history: history.history,
+              priceFacts: { latest: prices.latest, timeline: prices.timeline },
+              ratingFacts: { latest: ratings.latest, timeline: ratings.timeline },
+            },
             null,
             2,
           );
           $("detailPanel").scrollIntoView({ behavior: "smooth" });
         } catch (e) {
           toast(e.message);
+        }
+      }
+
+      async function loadFacts() {
+        try {
+          const [fresh, coverage, markets] = await Promise.all([
+            api("/freshness/stats"),
+            api("/coverage/stats"),
+            api("/markets"),
+          ]);
+          $("factStats").innerHTML = [
+            ["price facts (products)", fresh.price.productsWithFacts],
+            ["rating facts (products)", fresh.rating.productsWithFacts],
+            ["fresh ≤7d", fresh.price.freshWithin7Days],
+            ["stale >" + fresh.staleThresholdDays + "d", fresh.price.staleProducts],
+            ["no facts yet", fresh.price.productsWithoutFacts],
+            ["price coverage", coverage.productCoverage.priceCoveragePct + "%"],
+            ["facts w/o market", coverage.priceFactsWithoutMarket],
+          ]
+            .map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`)
+            .join("");
+          $("marketsPanel").innerHTML = markets.markets.length
+            ? `<table><tr><th>market</th><th>code</th><th>sources</th><th>products</th><th>price facts</th><th>rating facts</th></tr>` +
+              markets.markets
+                .map(
+                  (m) => `<tr>
+                    <td>${esc(m.name)}${m.note ? ' <span class="badge b-warn" title="' + esc(m.note) + '">internal code</span>' : ""}</td>
+                    <td>${esc(m.code)}</td><td>${m.sourceCount}</td><td>${m.productCount}</td>
+                    <td>${m.priceFactCount}</td><td>${m.ratingFactCount}</td>
+                  </tr>`,
+                )
+                .join("") +
+              "</table>"
+            : '<span class="muted">no markets mapped yet</span>';
+        } catch (e) {
+          $("factStats").innerHTML = `<span class="muted">${esc(e.message)}</span>`;
         }
       }
 
@@ -421,6 +472,7 @@
         loadProducts();
         loadQueue();
         loadRuns();
+        loadFacts();
       }
       refreshAll();
     </script>
