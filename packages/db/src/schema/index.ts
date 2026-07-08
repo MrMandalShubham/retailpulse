@@ -38,3 +38,6 @@ export {
 
 // Fact + market-mapping layer (Phase 6) — append-only history, honest mapping
 export { sourceMarkets, factRuns, productPriceFacts, productRatingFacts } from "./facts.js";
+
+// Enrichment provenance layer (Phase 7) — additive, fill-if-null, review-gated
+export { enrichmentRuns, productEnrichments } from "./enrichment.js";

@@ -43,6 +43,13 @@
       "when": 1783272483089,
       "tag": "0005_facts_markets",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783479862463,
+      "tag": "0006_enrichment",
+      "breakpoints": true
     }
   ]
 }

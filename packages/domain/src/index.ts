@@ -13,3 +13,4 @@ export * from "./ingestion/index.js";
 export * from "./raw-storage/index.js";
 export * from "./normalization/index.js";
 export * from "./ai-enrichment/index.js";
+export * from "./enrichment/index.js";

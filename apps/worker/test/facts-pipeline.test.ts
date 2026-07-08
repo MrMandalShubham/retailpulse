@@ -124,9 +124,15 @@ describe.skipIf(!testDbUrl)("fact pipeline (integration)", () => {
     const productIds = [productAId, productBId];
     // product_markets and the two V1 core fact tables reference products_master
     // WITHOUT ON DELETE CASCADE (Phase 1 design) — remove them first.
-    await db.delete(schema.retailPulsePrices).where(inArray(schema.retailPulsePrices.productId, productIds));
-    await db.delete(schema.voicePulseReviews).where(inArray(schema.voicePulseReviews.productId, productIds));
-    await db.delete(schema.productMarkets).where(inArray(schema.productMarkets.productId, productIds));
+    await db
+      .delete(schema.retailPulsePrices)
+      .where(inArray(schema.retailPulsePrices.productId, productIds));
+    await db
+      .delete(schema.voicePulseReviews)
+      .where(inArray(schema.voicePulseReviews.productId, productIds));
+    await db
+      .delete(schema.productMarkets)
+      .where(inArray(schema.productMarkets.productId, productIds));
     // product_price_facts / product_rating_facts DO cascade with products.
     await db.delete(schema.productsMaster).where(inArray(schema.productsMaster.id, productIds));
     await db.delete(schema.brands).where(eq(schema.brands.id, brandId));

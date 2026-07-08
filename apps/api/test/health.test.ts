@@ -19,6 +19,7 @@ const testConfig: AppConfig = {
   AI_MAX_RETRIES: 2,
   PROMOTION_MAX_ITEMS: 50,
   FACTS_MAX_PRODUCTS: 500,
+  ENRICH_MAX_PRODUCTS: 500,
 };
 
 describe("health endpoints", () => {

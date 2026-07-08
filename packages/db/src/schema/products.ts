@@ -43,6 +43,13 @@ export const productsMaster = pgTable(
     skinConcerns: text("skin_concerns").array(),
     spfValue: integer("spf_value"),
     keyClaims: text("key_claims").array(),
+    // Phase 7 enrichment columns (additive). Filled fill-if-null by @dip/enrichment,
+    // never overwriting existing values; provenance lives in product_enrichments.
+    paRating: text("pa_rating"),
+    texture: text("texture"),
+    ingredientHighlights: text("ingredient_highlights").array(),
+    sizeValue: numeric("size_value", { precision: 10, scale: 2 }),
+    sizeUnit: text("size_unit"),
     launchDate: date("launch_date"),
     discontinuationDate: date("discontinuation_date"),
     priceBenchmarkUsd: numeric("price_benchmark_usd", { precision: 12, scale: 2 }),

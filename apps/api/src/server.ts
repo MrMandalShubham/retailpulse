@@ -13,6 +13,7 @@ import { factsRoutes } from "./modules/facts/facts.routes.js";
 import { marketsRoutes } from "./modules/markets/markets.routes.js";
 import { insightsRoutes } from "./modules/insights/insights.routes.js";
 import { monitoringRoutes } from "./modules/monitoring/monitoring.routes.js";
+import { enrichmentRoutes } from "./modules/enrichment/enrichment.routes.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -41,6 +42,7 @@ export function buildServer(config: AppConfig): FastifyInstance {
   app.register(marketsRoutes);
   app.register(insightsRoutes);
   app.register(monitoringRoutes);
+  app.register(enrichmentRoutes);
 
   // Static internal pages (no framework, no build step) in apps/api/public/:
   //   /dashboard   — Phase 5 operator dashboard

@@ -11,11 +11,13 @@
     "transform": "tsx src/transform/run.ts",
     "ai-review": "tsx src/ai-review/run.ts",
     "promote": "tsx src/promote.ts",
-    "facts": "tsx src/facts/run.ts"
+    "facts": "tsx src/facts/run.ts",
+    "enrich": "tsx src/enrich.ts"
   },
   "dependencies": {
     "@dip/ai": "workspace:*",
     "@dip/config": "workspace:*",
+    "@dip/enrichment": "workspace:*",
     "@dip/promotion": "workspace:*",
     "@dip/db": "workspace:*",
     "@dip/domain": "workspace:*",

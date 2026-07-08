@@ -149,4 +149,25 @@ if (xgMarket && oliveYoung) {
   console.log("seeded market 'Global (Cross-border)' (XG) + oliveyoung-global mapping");
 }
 
+// ---------------------------------------------------------------------------
+// Phase 7: real ISO country markets (reference structure). These are seeded as
+// master data but left UNMAPPED (no source_markets) — a country market only
+// receives facts once a country-specific source is mapped to it by an operator.
+// Real ISO 3166-1 alpha-2 codes (unlike the internal XG cross-border code).
+// ---------------------------------------------------------------------------
+const COUNTRY_MARKETS = [
+  { name: "South Korea", code: "KR", region: "Asia", regulatoryAuthority: "MFDS" },
+  { name: "United States", code: "US", region: "North America", regulatoryAuthority: "FDA" },
+  { name: "Japan", code: "JP", region: "Asia", regulatoryAuthority: "MHLW" },
+  { name: "United Kingdom", code: "GB", region: "Europe", regulatoryAuthority: "OPSS" },
+];
+const seededMarkets = await db
+  .insert(markets)
+  .values(COUNTRY_MARKETS)
+  .onConflictDoNothing({ target: markets.code })
+  .returning({ code: markets.code });
+console.log(
+  `seeded ${seededMarkets.length} new country markets (KR/US/JP/GB reference structure; unmapped until a country source is added)`,
+);
+
 await pool.end();

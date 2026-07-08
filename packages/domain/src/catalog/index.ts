@@ -38,6 +38,12 @@ export interface Product {
   skinConcerns: string[] | null;
   spfValue: number | null;
   keyClaims: string[] | null;
+  /** Phase 7 enrichment fields (fill-if-null). */
+  paRating: string | null;
+  texture: string | null;
+  ingredientHighlights: string[] | null;
+  sizeValue: number | null;
+  sizeUnit: string | null;
   launchDate: string | null;
   discontinuationDate: string | null;
   priceBenchmarkUsd: number | null;

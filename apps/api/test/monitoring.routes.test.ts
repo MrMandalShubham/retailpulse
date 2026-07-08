@@ -19,6 +19,7 @@ function makeConfig(databaseUrl: string): AppConfig {
     AI_MAX_RETRIES: 2,
     PROMOTION_MAX_ITEMS: 50,
     FACTS_MAX_PRODUCTS: 500,
+    ENRICH_MAX_PRODUCTS: 500,
   };
 }
 
@@ -27,8 +28,12 @@ describe("monitoring routes — validation & static (no database needed)", () =>
     const app = buildServer(makeConfig("postgres://unused:unused@localhost:5432/unused"));
 
     // runs limit out of range → 400 (validated before any query)
-    expect((await app.inject({ method: "GET", url: "/monitoring/runs?limit=0" })).statusCode).toBe(400);
-    expect((await app.inject({ method: "GET", url: "/monitoring/runs?limit=999" })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: "/monitoring/runs?limit=0" })).statusCode).toBe(
+      400,
+    );
+    expect(
+      (await app.inject({ method: "GET", url: "/monitoring/runs?limit=999" })).statusCode,
+    ).toBe(400);
 
     // record inspector on a non-monitored table → 404 (config-checked, no DB)
     expect(
@@ -37,8 +42,12 @@ describe("monitoring routes — validation & static (no database needed)", () =>
     ).toBe(404);
     // bad record limit on a known table → 400
     expect(
-      (await app.inject({ method: "GET", url: "/monitoring/tables/products_master/records?limit=500" }))
-        .statusCode,
+      (
+        await app.inject({
+          method: "GET",
+          url: "/monitoring/tables/products_master/records?limit=500",
+        })
+      ).statusCode,
     ).toBe(400);
 
     await app.close();

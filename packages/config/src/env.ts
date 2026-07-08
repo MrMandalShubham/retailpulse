@@ -47,6 +47,9 @@ const envSchema = z.object({
 
   // Fact pipeline: per-run cap on evidence rows considered.
   FACTS_MAX_PRODUCTS: z.coerce.number().int().positive().default(500),
+
+  // Enrichment pass: per-run cap on products considered.
+  ENRICH_MAX_PRODUCTS: z.coerce.number().int().positive().default(500),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

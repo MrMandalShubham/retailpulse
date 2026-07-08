@@ -38,6 +38,9 @@ importers:
       '@dip/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@dip/enrichment':
+        specifier: workspace:*
+        version: link:../../packages/enrichment
       '@dip/promotion':
         specifier: workspace:*
         version: link:../../packages/promotion
@@ -78,6 +81,9 @@ importers:
       '@dip/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@dip/enrichment':
+        specifier: workspace:*
+        version: link:../../packages/enrichment
       '@dip/promotion':
         specifier: workspace:*
         version: link:../../packages/promotion
@@ -172,6 +178,22 @@ importers:
 
   packages/domain:
     devDependencies:
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+
+  packages/enrichment:
+    dependencies:
+      '@dip/db':
+        specifier: workspace:*
+        version: link:../db
+      '@dip/domain':
+        specifier: workspace:*
+        version: link:../domain
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.20.0
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
