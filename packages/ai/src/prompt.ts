@@ -25,7 +25,13 @@ Rules you must always follow:
 4. Suggest a rule (in "suggested_rules") ONLY when you see a clearly repeatable pattern: a brand alias, a category/product-type keyword, a currency symbol mapping. One-off fixes are NOT rules. Allowed rule types are listed in "allowed_rule_types".
 5. Every decision and every suggested rule carries a "confidence" between 0 and 1. Be conservative: prefer lower confidence over false certainty.
 6. "decision_type" must be one of: "resolved" (all questions settled), "partially_resolved" (some fields settled), "unresolved" (evidence too weak), "rejected" (the item is not a real product candidate).
-7. If the page type looks misclassified, set "page_type_suggestion"; otherwise leave it null.`;
+7. If the page type looks misclassified, set "page_type_suggestion"; otherwise leave it null.
+8. CRITICAL — "match_key" must be the ACTUAL lowercase token to match against real data, NEVER a field label like "name", "raw_value", or "product_type_keyword". Per rule type:
+   - brand_alias: match_key = the raw brand text, lowercased (e.g. "beauty of joseon"); normalized_value = the canonical brand ("Beauty of Joseon").
+   - product_type_keyword: match_key = the single lowercase keyword that appears in product names (e.g. "serum", "essence", "ampoule", "cream"); normalized_value = the canonical product type ("Serum", "Essence", "Ampoule", "Cream").
+   - category_keyword: match_key = the lowercase keyword; normalized_value = the canonical category.
+   - currency_hint: match_key = the currency symbol (e.g. "₩"); normalized_value = the ISO code ("KRW").
+   If you cannot give a concrete match_key that would literally appear in product data, DO NOT emit the rule.`;
 
 /** JSON schema description embedded in every payload so any model knows the shape. */
 const RESPONSE_SCHEMA_DESCRIPTION = {
@@ -38,12 +44,25 @@ const RESPONSE_SCHEMA_DESCRIPTION = {
     {
       rule_type: `one of ${RULE_TYPES.join(" | ")}`,
       source_scope: "source slug or 'global'",
-      match_key: "string to match",
+      match_key:
+        "the ACTUAL lowercase token to match (e.g. 'serum', 'beauty of joseon') — NOT a field label",
       match_value: "string or null",
       normalized_key: "string or null",
-      normalized_value: "string or null",
+      normalized_value: "the canonical value (e.g. 'Serum', 'Beauty of Joseon')",
       confidence: "number 0..1",
       rationale: "short string or null",
+    },
+  ],
+  suggested_rules_example: [
+    {
+      rule_type: "product_type_keyword",
+      source_scope: "global",
+      match_key: "serum",
+      match_value: null,
+      normalized_key: null,
+      normalized_value: "Serum",
+      confidence: 0.95,
+      rationale: "the word 'serum' in the product name indicates the product type",
     },
   ],
   notes: "short string or null",

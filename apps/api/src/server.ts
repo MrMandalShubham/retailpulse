@@ -12,6 +12,7 @@ import { promotionRoutes } from "./modules/promotion/promotion.routes.js";
 import { factsRoutes } from "./modules/facts/facts.routes.js";
 import { marketsRoutes } from "./modules/markets/markets.routes.js";
 import { insightsRoutes } from "./modules/insights/insights.routes.js";
+import { monitoringRoutes } from "./modules/monitoring/monitoring.routes.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -39,14 +40,17 @@ export function buildServer(config: AppConfig): FastifyInstance {
   app.register(factsRoutes);
   app.register(marketsRoutes);
   app.register(insightsRoutes);
+  app.register(monitoringRoutes);
 
-  // Internal operator dashboard (Phase 5 shell): a single static page over the
-  // JSON APIs — no framework, no build step. Located in apps/api/public/.
+  // Static internal pages (no framework, no build step) in apps/api/public/:
+  //   /dashboard   — Phase 5 operator dashboard
+  //   /monitoring  — DIP Engine observability & data-quality console
   app.register(fastifyStatic, {
     root: fileURLToPath(new URL("../public", import.meta.url)),
     serve: false,
   });
   app.get("/dashboard", (_request, reply) => reply.sendFile("dashboard.html"));
+  app.get("/monitoring", (_request, reply) => reply.sendFile("monitoring.html"));
 
   return app;
 }
