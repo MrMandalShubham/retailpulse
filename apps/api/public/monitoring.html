@@ -1,255 +1,776 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>DIP Engine — Observability Console</title>
-<style>
-  :root{--bg:#0e131f;--panel:#161d2c;--panel2:#1c2536;--line:#28324a;--text:#e7ecf5;--dim:#8894ab;
-    --accent:#5b8cff;--ok:#3ecf8e;--warn:#f5a623;--bad:#ef5b5b;--info:#57b6ff;}
-  *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--text);font:13.5px/1.5 system-ui,"Segoe UI",sans-serif}
-  header{position:sticky;top:0;z-index:10;background:linear-gradient(#0e131fee,#0e131fcc);backdrop-filter:blur(6px);
-    border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-  header h1{font-size:16px;letter-spacing:.02em}
-  header .env{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
-  header .spacer{flex:1}
-  header .updated{font-size:11px;color:var(--dim)}
-  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 11px;font:inherit;cursor:pointer}
-  button.on{border-color:var(--accent);color:#fff}
-  nav{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:49px;z-index:9;flex-wrap:wrap}
-  nav a{padding:7px 13px;border-radius:6px;color:var(--dim);cursor:pointer;font-weight:600;font-size:12.5px}
-  nav a.active{background:var(--panel2);color:var(--text)}
-  main{padding:18px 20px;max-width:1500px;margin:0 auto}
-  .tab{display:none} .tab.active{display:block}
-  h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin:22px 0 10px}
-  h2:first-child{margin-top:0}
-  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
-  .card b{display:block;font-size:24px;line-height:1.1}
-  .card span{color:var(--dim);font-size:11.5px}
-  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto}
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
-  th{color:var(--dim);font-weight:600;position:sticky;top:0;background:var(--panel)}
-  tr.click{cursor:pointer} tr.click:hover{background:#5b8cff14}
-  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;border:1px solid var(--line)}
-  .b-ok{color:var(--ok);border-color:#3ecf8e55} .b-warn{color:var(--warn);border-color:#f5a62355}
-  .b-bad{color:var(--bad);border-color:#ef5b5b55} .b-info{color:var(--info);border-color:#57b6ff55}
-  .b-core{color:#c8b3ff;border-color:#8b6cff55}
-  .bar{height:7px;border-radius:4px;background:#2a3450;overflow:hidden;min-width:60px;display:inline-block;vertical-align:middle}
-  .bar>i{display:block;height:100%}
-  .mut{color:var(--dim)} .r{ text-align:right } .mono{font-family:ui-monospace,monospace;font-size:11.5px}
-  .phase{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
-  .pcard{min-width:210px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;flex:1}
-  .pcard .n{font-weight:700;font-size:13px} .pcard .s{font-size:11px;color:var(--dim)}
-  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
-  pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:360px;overflow:auto;font-size:11.5px;white-space:pre-wrap}
-  .alert{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);border-left-width:3px;border-radius:8px;margin-bottom:8px}
-  .alert.critical{border-left-color:var(--bad)} .alert.warning{border-left-color:var(--warn)} .alert.info{border-left-color:var(--info)}
-  .alert .cat{font-size:11px;color:var(--dim)}
-  .controls{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
-  select,input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font:inherit}
-  .empty{color:var(--dim);padding:10px}
-</style>
-</head>
-<body>
-<header>
-  <h1>DIP Engine — Observability Console</h1>
-  <span class="env" id="env">connecting…</span>
-  <div class="spacer"></div>
-  <span class="updated" id="updated"></span>
-  <button id="autoBtn" class="on" onclick="toggleAuto()">Auto-refresh: ON</button>
-  <button onclick="refreshAll()">Refresh</button>
-</header>
-<nav id="nav"></nav>
-<main>
-  <section class="tab active" id="tab-overview">
-    <h2>Summary</h2><div class="cards" id="cards"></div>
-    <h2>Workflow phases (P1 → P6)</h2><div class="phase" id="phases"></div>
-    <h2>Attention</h2><div id="ovAlerts"></div>
-  </section>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DIP Engine — Observability Console</title>
+    <style>
+      :root {
+        --bg: #0e131f;
+        --panel: #161d2c;
+        --panel2: #1c2536;
+        --line: #28324a;
+        --text: #e7ecf5;
+        --dim: #8894ab;
+        --accent: #5b8cff;
+        --ok: #3ecf8e;
+        --warn: #f5a623;
+        --bad: #ef5b5b;
+        --info: #57b6ff;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font:
+          13.5px/1.5 system-ui,
+          "Segoe UI",
+          sans-serif;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: linear-gradient(#0e131fee, #0e131fcc);
+        backdrop-filter: blur(6px);
+        border-bottom: 1px solid var(--line);
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header h1 {
+        font-size: 16px;
+        letter-spacing: 0.02em;
+      }
+      header .env {
+        font-size: 11px;
+        color: var(--dim);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 2px 10px;
+      }
+      header .spacer {
+        flex: 1;
+      }
+      header .updated {
+        font-size: 11px;
+        color: var(--dim);
+      }
+      button {
+        background: var(--panel2);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 6px 11px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.on {
+        border-color: var(--accent);
+        color: #fff;
+      }
+      nav {
+        display: flex;
+        gap: 4px;
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bg);
+        position: sticky;
+        top: 49px;
+        z-index: 9;
+        flex-wrap: wrap;
+      }
+      nav a {
+        padding: 7px 13px;
+        border-radius: 6px;
+        color: var(--dim);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 12.5px;
+      }
+      nav a.active {
+        background: var(--panel2);
+        color: var(--text);
+      }
+      main {
+        padding: 18px 20px;
+        max-width: 1500px;
+        margin: 0 auto;
+      }
+      .tab {
+        display: none;
+      }
+      .tab.active {
+        display: block;
+      }
+      h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--dim);
+        margin: 22px 0 10px;
+      }
+      h2:first-child {
+        margin-top: 0;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .card b {
+        display: block;
+        font-size: 24px;
+        line-height: 1.1;
+      }
+      .card span {
+        color: var(--dim);
+        font-size: 11.5px;
+      }
+      .grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 7px 9px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+        vertical-align: middle;
+      }
+      th {
+        color: var(--dim);
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        background: var(--panel);
+      }
+      tr.click {
+        cursor: pointer;
+      }
+      tr.click:hover {
+        background: #5b8cff14;
+      }
+      .badge {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        border: 1px solid var(--line);
+      }
+      .b-ok {
+        color: var(--ok);
+        border-color: #3ecf8e55;
+      }
+      .b-warn {
+        color: var(--warn);
+        border-color: #f5a62355;
+      }
+      .b-bad {
+        color: var(--bad);
+        border-color: #ef5b5b55;
+      }
+      .b-info {
+        color: var(--info);
+        border-color: #57b6ff55;
+      }
+      .b-core {
+        color: #c8b3ff;
+        border-color: #8b6cff55;
+      }
+      .bar {
+        height: 7px;
+        border-radius: 4px;
+        background: #2a3450;
+        overflow: hidden;
+        min-width: 60px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .bar > i {
+        display: block;
+        height: 100%;
+      }
+      .mut {
+        color: var(--dim);
+      }
+      .r {
+        text-align: right;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 11.5px;
+      }
+      .phase {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .pcard {
+        min-width: 210px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        flex: 1;
+      }
+      .pcard .n {
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .pcard .s {
+        font-size: 11px;
+        color: var(--dim);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+      }
+      pre {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        max-height: 360px;
+        overflow: auto;
+        font-size: 11.5px;
+        white-space: pre-wrap;
+      }
+      .alert {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-left-width: 3px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+      }
+      .alert.critical {
+        border-left-color: var(--bad);
+      }
+      .alert.warning {
+        border-left-color: var(--warn);
+      }
+      .alert.info {
+        border-left-color: var(--info);
+      }
+      .alert .cat {
+        font-size: 11px;
+        color: var(--dim);
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      select,
+      input {
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 6px 9px;
+        font: inherit;
+      }
+      .empty {
+        color: var(--dim);
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>DIP Engine — Observability Console</h1>
+      <span class="env" id="env">connecting…</span>
+      <div class="spacer"></div>
+      <span class="updated" id="updated"></span>
+      <button id="autoBtn" class="on" onclick="toggleAuto()">Auto-refresh: ON</button>
+      <button onclick="refreshAll()">Refresh</button>
+    </header>
+    <nav id="nav"></nav>
+    <main>
+      <section class="tab active" id="tab-overview">
+        <h2>Summary</h2>
+        <div class="cards" id="cards"></div>
+        <h2>Workflow phases (P1 → P6)</h2>
+        <div class="phase" id="phases"></div>
+        <h2>Attention</h2>
+        <div id="ovAlerts"></div>
+      </section>
 
-  <section class="tab" id="tab-tables">
-    <h2>Core table health</h2>
-    <div class="panel"><table id="tablesTbl"><thead><tr>
-      <th>Table</th><th>Layer</th><th class="r">Rows</th><th class="r">Dupes</th>
-      <th>Latest insert</th><th>Null hotspots (important columns)</th></tr></thead><tbody></tbody></table></div>
-    <h2>Record inspector</h2>
-    <div class="controls">
-      <select id="insTable" onchange="loadRecords()"></select>
-      <select id="insMode" onchange="loadRecords()"><option value="latest">Latest inserted</option><option value="suspicious">Suspicious (missing fields)</option></select>
-      <input id="insLimit" type="number" value="15" min="1" max="100" style="width:80px" onchange="loadRecords()"/>
-      <span class="mut" id="insMeta"></span>
-    </div>
-    <div class="panel"><pre id="insOut" class="empty">select a table…</pre></div>
-  </section>
+      <section class="tab" id="tab-tables">
+        <h2>Core table health</h2>
+        <div class="panel">
+          <table id="tablesTbl">
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th>Layer</th>
+                <th class="r">Rows</th>
+                <th class="r">Dupes</th>
+                <th>Latest insert</th>
+                <th>Null hotspots (important columns)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <h2>Record inspector</h2>
+        <div class="controls">
+          <select id="insTable" onchange="loadRecords()"></select>
+          <select id="insMode" onchange="loadRecords()">
+            <option value="latest">Latest inserted</option>
+            <option value="suspicious">Suspicious (missing fields)</option>
+          </select>
+          <input
+            id="insLimit"
+            type="number"
+            value="15"
+            min="1"
+            max="100"
+            style="width: 80px"
+            onchange="loadRecords()"
+          />
+          <span class="mut" id="insMeta"></span>
+        </div>
+        <div class="panel"><pre id="insOut" class="empty">select a table…</pre></div>
+      </section>
 
-  <section class="tab" id="tab-quality">
-    <div class="grid">
-      <div class="panel"><h2 style="margin-top:0">Pipeline integrity &amp; stuck records</h2>
-        <table id="dqChecks"><tbody></tbody></table></div>
-      <div class="panel"><h2 style="margin-top:0">Null hotspots (column-level)</h2>
-        <table id="dqNulls"><thead><tr><th>Column</th><th class="r">Null %</th><th>Level</th></tr></thead><tbody></tbody></table></div>
-    </div>
-    <h2>Duplicate detection (business keys)</h2>
-    <div class="panel"><table id="dqDupes"><thead><tr><th>Table</th><th class="r">Duplicate keys</th></tr></thead><tbody></tbody></table></div>
-  </section>
+      <section class="tab" id="tab-quality">
+        <div class="grid">
+          <div class="panel">
+            <h2 style="margin-top: 0">Pipeline integrity &amp; stuck records</h2>
+            <table id="dqChecks">
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h2 style="margin-top: 0">Null hotspots (column-level)</h2>
+            <table id="dqNulls">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th class="r">Null %</th>
+                  <th>Level</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <h2>Duplicate detection (business keys)</h2>
+        <div class="panel">
+          <table id="dqDupes">
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th class="r">Duplicate keys</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
 
-  <section class="tab" id="tab-ai">
-    <h2>AI learning signal</h2><div class="cards" id="aiCards"></div>
-    <h2>AI review runs (run-by-run)</h2>
-    <div class="panel"><table id="aiRuns"><thead><tr>
-      <th>When</th><th>Provider / model</th><th>Status</th><th class="r">Items</th><th class="r">OK</th>
-      <th class="r">Failed</th><th class="r">Suggestions</th></tr></thead><tbody></tbody></table></div>
-    <h2>Transform quality trend — is output getting cleaner? (newest first)</h2>
-    <div class="panel"><table id="aiTrend"><thead><tr>
-      <th>When</th><th class="r">Staged</th><th>Valid %</th><th class="r">Avg conf</th>
-      <th class="r">Avg unresolved</th><th class="r">Observations</th></tr></thead><tbody></tbody></table></div>
-    <h2>Promotion success trend</h2>
-    <div class="panel"><table id="aiPromo"><thead><tr>
-      <th>When</th><th class="r">Items</th><th>Promoted / matched</th><th class="r">Failed</th></tr></thead><tbody></tbody></table></div>
-  </section>
+      <section class="tab" id="tab-ai">
+        <h2>AI learning signal</h2>
+        <div class="cards" id="aiCards"></div>
+        <h2>AI review runs (run-by-run)</h2>
+        <div class="panel">
+          <table id="aiRuns">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Provider / model</th>
+                <th>Status</th>
+                <th class="r">Items</th>
+                <th class="r">OK</th>
+                <th class="r">Failed</th>
+                <th class="r">Suggestions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <h2>Transform quality trend — is output getting cleaner? (newest first)</h2>
+        <div class="panel">
+          <table id="aiTrend">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th class="r">Staged</th>
+                <th>Valid %</th>
+                <th class="r">Avg conf</th>
+                <th class="r">Avg unresolved</th>
+                <th class="r">Observations</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <h2>Promotion success trend</h2>
+        <div class="panel">
+          <table id="aiPromo">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th class="r">Items</th>
+                <th>Promoted / matched</th>
+                <th class="r">Failed</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
 
-  <section class="tab" id="tab-runs">
-    <h2>Unified run history</h2>
-    <div class="controls"><label class="mut">Show <input id="runLimit" type="number" value="60" min="1" max="200" style="width:80px" onchange="loadRuns()"/> runs</label></div>
-    <div class="panel"><table id="runsTbl"><thead><tr>
-      <th>Phase</th><th>When</th><th>Status</th><th class="r">Input</th><th class="r">Processed</th>
-      <th class="r">Failed</th><th>Duration</th><th>Note</th></tr></thead><tbody></tbody></table></div>
-  </section>
+      <section class="tab" id="tab-runs">
+        <h2>Unified run history</h2>
+        <div class="controls">
+          <label class="mut"
+            >Show
+            <input
+              id="runLimit"
+              type="number"
+              value="60"
+              min="1"
+              max="200"
+              style="width: 80px"
+              onchange="loadRuns()"
+            />
+            runs</label
+          >
+        </div>
+        <div class="panel">
+          <table id="runsTbl">
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>When</th>
+                <th>Status</th>
+                <th class="r">Input</th>
+                <th class="r">Processed</th>
+                <th class="r">Failed</th>
+                <th>Duration</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
 
-  <section class="tab" id="tab-alerts">
-    <h2>Alert center</h2><div id="alertList"></div>
-  </section>
-</main>
+      <section class="tab" id="tab-alerts">
+        <h2>Alert center</h2>
+        <div id="alertList"></div>
+      </section>
+    </main>
 
-<script>
-const $=id=>document.getElementById(id);
-const esc=v=>String(v??"—").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const api=async p=>{const r=await fetch(p);if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||("HTTP "+r.status));return r.json();};
-const TABS=[["overview","Overview"],["tables","Core Tables"],["quality","Data Quality"],["ai","AI Quality"],["runs","Run History"],["alerts","Alerts"]];
-let active="overview", auto=true, timer=null;
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const esc = (v) =>
+        String(v ?? "—").replace(
+          /[&<>"]/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+      const api = async (p) => {
+        const r = await fetch(p);
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "HTTP " + r.status);
+        return r.json();
+      };
+      const TABS = [
+        ["overview", "Overview"],
+        ["tables", "Core Tables"],
+        ["quality", "Data Quality"],
+        ["ai", "AI Quality"],
+        ["runs", "Run History"],
+        ["alerts", "Alerts"],
+      ];
+      let active = "overview",
+        auto = true,
+        timer = null;
 
-$("nav").innerHTML=TABS.map(([k,l])=>`<a data-k="${k}" class="${k==='overview'?'active':''}" onclick="go('${k}')">${l}</a>`).join("");
-function go(k){active=k;document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.dataset.k===k));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+k));loadTab(k);}
-function toggleAuto(){auto=!auto;$("autoBtn").textContent="Auto-refresh: "+(auto?"ON":"OFF");$("autoBtn").classList.toggle('on',auto);schedule();}
-function schedule(){if(timer)clearInterval(timer);if(auto)timer=setInterval(()=>loadTab(active),15000);}
-const lvlClass=l=>l==='critical'?'b-bad':l==='warning'?'b-warn':'b-info';
-const dot=s=>`<span class="dot" style="background:${s==='succeeded'?'var(--ok)':s==='failed'?'var(--bad)':s==='running'?'var(--warn)':'var(--dim)'}"></span>`;
-const bar=(pct,color)=>`<span class="bar"><i style="width:${Math.min(pct,100)}%;background:${color}"></i></span>`;
-const dur=(a,b)=>{if(!a||!b)return "—";const s=Math.round((new Date(b)-new Date(a))/1000);return s>=60?`${Math.floor(s/60)}m ${s%60}s`:`${s}s`;};
-const ago=t=>{if(!t)return "—";const s=Math.round((Date.now()-new Date(t))/1000);if(s<60)return s+"s ago";if(s<3600)return Math.floor(s/60)+"m ago";if(s<86400)return Math.floor(s/3600)+"h ago";return new Date(t).toLocaleDateString();};
+      $("nav").innerHTML = TABS.map(
+        ([k, l]) =>
+          `<a data-k="${k}" class="${k === "overview" ? "active" : ""}" onclick="go('${k}')">${l}</a>`,
+      ).join("");
+      function go(k) {
+        active = k;
+        document
+          .querySelectorAll("nav a")
+          .forEach((a) => a.classList.toggle("active", a.dataset.k === k));
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.toggle("active", t.id === "tab-" + k));
+        loadTab(k);
+      }
+      function toggleAuto() {
+        auto = !auto;
+        $("autoBtn").textContent = "Auto-refresh: " + (auto ? "ON" : "OFF");
+        $("autoBtn").classList.toggle("on", auto);
+        schedule();
+      }
+      function schedule() {
+        if (timer) clearInterval(timer);
+        if (auto) timer = setInterval(() => loadTab(active), 15000);
+      }
+      const lvlClass = (l) => (l === "critical" ? "b-bad" : l === "warning" ? "b-warn" : "b-info");
+      const dot = (s) =>
+        `<span class="dot" style="background:${s === "succeeded" ? "var(--ok)" : s === "failed" ? "var(--bad)" : s === "running" ? "var(--warn)" : "var(--dim)"}"></span>`;
+      const bar = (pct, color) =>
+        `<span class="bar"><i style="width:${Math.min(pct, 100)}%;background:${color}"></i></span>`;
+      const dur = (a, b) => {
+        if (!a || !b) return "—";
+        const s = Math.round((new Date(b) - new Date(a)) / 1000);
+        return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+      };
+      const ago = (t) => {
+        if (!t) return "—";
+        const s = Math.round((Date.now() - new Date(t)) / 1000);
+        if (s < 60) return s + "s ago";
+        if (s < 3600) return Math.floor(s / 60) + "m ago";
+        if (s < 86400) return Math.floor(s / 3600) + "h ago";
+        return new Date(t).toLocaleDateString();
+      };
 
-async function loadTab(k){
-  try{
-    if(k==="overview")await loadOverview();
-    else if(k==="tables")await loadTables();
-    else if(k==="quality")await loadQuality();
-    else if(k==="ai")await loadAI();
-    else if(k==="runs")await loadRuns();
-    else if(k==="alerts")await loadAlerts();
-    $("updated").textContent="updated "+new Date().toLocaleTimeString();
-  }catch(e){$("updated").textContent="error: "+e.message;}
-}
-function refreshAll(){loadTab(active);}
+      async function loadTab(k) {
+        try {
+          if (k === "overview") await loadOverview();
+          else if (k === "tables") await loadTables();
+          else if (k === "quality") await loadQuality();
+          else if (k === "ai") await loadAI();
+          else if (k === "runs") await loadRuns();
+          else if (k === "alerts") await loadAlerts();
+          $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+        } catch (e) {
+          $("updated").textContent = "error: " + e.message;
+        }
+      }
+      function refreshAll() {
+        loadTab(active);
+      }
 
-async function loadOverview(){
-  const o=await api("/monitoring/overview");$("env").textContent="DB connected";
-  const c=o.cards;
-  $("cards").innerHTML=[
-    ["Products",c.products],["Brands",c.brands],["Categories",c.categories],["Product types",c.types],
-    ["Markets",c.markets],["Price facts",c.priceFacts],["Rating facts",c.ratingFacts],
-    ["Open observations",c.openObservations],["Open AI suggestions",c.openSuggestions],["Staged: needs review",c.stagedNeedsReview],
-    ["Critical alerts",o.alertCounts.critical],["Warnings",o.alertCounts.warning],
-  ].map(([l,v])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join("");
-  const {phases}=await api("/monitoring/phases");
-  $("phases").innerHTML=phases.map(p=>`<div class="pcard">
+      async function loadOverview() {
+        const o = await api("/monitoring/overview");
+        $("env").textContent = "DB connected";
+        const c = o.cards;
+        $("cards").innerHTML = [
+          ["Products", c.products],
+          ["Brands", c.brands],
+          ["Categories", c.categories],
+          ["Product types", c.types],
+          ["Markets", c.markets],
+          ["Price facts", c.priceFacts],
+          ["Rating facts", c.ratingFacts],
+          ["Open observations", c.openObservations],
+          ["Open AI suggestions", c.openSuggestions],
+          ["Staged: needs review", c.stagedNeedsReview],
+          ["Critical alerts", o.alertCounts.critical],
+          ["Warnings", o.alertCounts.warning],
+        ]
+          .map(([l, v]) => `<div class="card"><b>${v}</b><span>${l}</span></div>`)
+          .join("");
+        const { phases } = await api("/monitoring/phases");
+        $("phases").innerHTML = phases
+          .map(
+            (p) => `<div class="pcard">
     <div class="n">P${p.id}· ${esc(p.name)}</div>
-    <div class="s" style="margin:6px 0">${dot(p.lastRunStatus||'')}last run: ${esc(p.lastRunStatus||'n/a')}</div>
+    <div class="s" style="margin:6px 0">${dot(p.lastRunStatus || "")}last run: ${esc(p.lastRunStatus || "n/a")}</div>
     <div class="s">output rows: <b style="color:var(--text)">${p.outputRows}</b></div>
     <div class="s">runs: ${p.runs} · <span style="color:var(--ok)">${p.succeededRuns} ok</span> · <span style="color:var(--bad)">${p.failedRuns} fail</span></div>
-    <div class="s">processed: ${p.processed} · failed: ${p.failed}${p.avgSeconds!=null?` · ~${p.avgSeconds}s/run`:''}</div>
-  </div>`).join("");
-  const {alerts}=await api("/monitoring/alerts");
-  $("ovAlerts").innerHTML=alerts.length?alerts.slice(0,6).map(a=>alertRow(a)).join(""):'<div class="empty">No active alerts. 🎉</div>';
-}
-const alertRow=a=>`<div class="alert ${a.level}"><span class="badge ${lvlClass(a.level)}">${a.level}</span>
+    <div class="s">processed: ${p.processed} · failed: ${p.failed}${p.avgSeconds != null ? ` · ~${p.avgSeconds}s/run` : ""}</div>
+  </div>`,
+          )
+          .join("");
+        const { alerts } = await api("/monitoring/alerts");
+        $("ovAlerts").innerHTML = alerts.length
+          ? alerts
+              .slice(0, 6)
+              .map((a) => alertRow(a))
+              .join("")
+          : '<div class="empty">No active alerts. 🎉</div>';
+      }
+      const alertRow = (
+        a,
+      ) => `<div class="alert ${a.level}"><span class="badge ${lvlClass(a.level)}">${a.level}</span>
   <div><div>${esc(a.message)}</div><div class="cat">${esc(a.category)}</div></div></div>`;
 
-async function loadTables(){
-  const {tables}=await api("/monitoring/tables");
-  const sel=$("insTable");if(!sel.options.length)sel.innerHTML=tables.map(t=>`<option value="${t.table}">${esc(t.label)}</option>`).join("");
-  $("tablesTbl").querySelector("tbody").innerHTML=tables.map(t=>{
-    const hot=t.columns.filter(c=>c.nullPct>0).sort((a,b)=>b.nullPct-a.nullPct).slice(0,4)
-      .map(c=>`<span class="mono">${esc(c.column)}</span> ${bar(c.nullPct,c.nullPct>=60?'var(--bad)':c.nullPct>=25?'var(--warn)':'var(--dim)')} <span class="mut">${c.nullPct}%</span>`).join(" &nbsp; ")||'<span class="mut">clean</span>';
-    return `<tr><td>${esc(t.label)} ${t.core?'<span class="badge b-core">core</span>':''}<br><span class="mono mut">${esc(t.table)}</span></td>
+      async function loadTables() {
+        const { tables } = await api("/monitoring/tables");
+        const sel = $("insTable");
+        if (!sel.options.length)
+          sel.innerHTML = tables
+            .map((t) => `<option value="${t.table}">${esc(t.label)}</option>`)
+            .join("");
+        $("tablesTbl").querySelector("tbody").innerHTML = tables
+          .map((t) => {
+            const hot =
+              t.columns
+                .filter((c) => c.nullPct > 0)
+                .sort((a, b) => b.nullPct - a.nullPct)
+                .slice(0, 4)
+                .map(
+                  (c) =>
+                    `<span class="mono">${esc(c.column)}</span> ${bar(c.nullPct, c.nullPct >= 60 ? "var(--bad)" : c.nullPct >= 25 ? "var(--warn)" : "var(--dim)")} <span class="mut">${c.nullPct}%</span>`,
+                )
+                .join(" &nbsp; ") || '<span class="mut">clean</span>';
+            return `<tr><td>${esc(t.label)} ${t.core ? '<span class="badge b-core">core</span>' : ""}<br><span class="mono mut">${esc(t.table)}</span></td>
       <td><span class="badge">${esc(t.layer)}</span></td><td class="r"><b>${t.rowCount}</b></td>
-      <td class="r">${t.duplicateCount==null?'—':(t.duplicateCount>0?`<span class="b-warn badge">${t.duplicateCount}</span>`:'0')}</td>
-      <td class="mut">${ago(t.latestInsert)}</td><td>${hot}</td></tr>`;}).join("");
-}
-async function loadRecords(){
-  const t=$("insTable").value;if(!t)return;
-  const mode=$("insMode").value,limit=$("insLimit").value||15;
-  try{const d=await api(`/monitoring/tables/${t}/records?mode=${mode}&limit=${limit}`);
-    $("insMeta").textContent=`${d.records.length} ${mode} row(s) from ${t}`;
-    $("insOut").classList.remove("empty");
-    $("insOut").textContent=d.records.length?JSON.stringify(d.records,null,2):"(no rows)";
-  }catch(e){$("insOut").textContent="error: "+e.message;}
-}
+      <td class="r">${t.duplicateCount == null ? "—" : t.duplicateCount > 0 ? `<span class="b-warn badge">${t.duplicateCount}</span>` : "0"}</td>
+      <td class="mut">${ago(t.latestInsert)}</td><td>${hot}</td></tr>`;
+          })
+          .join("");
+      }
+      async function loadRecords() {
+        const t = $("insTable").value;
+        if (!t) return;
+        const mode = $("insMode").value,
+          limit = $("insLimit").value || 15;
+        try {
+          const d = await api(`/monitoring/tables/${t}/records?mode=${mode}&limit=${limit}`);
+          $("insMeta").textContent = `${d.records.length} ${mode} row(s) from ${t}`;
+          $("insOut").classList.remove("empty");
+          $("insOut").textContent = d.records.length
+            ? JSON.stringify(d.records, null, 2)
+            : "(no rows)";
+        } catch (e) {
+          $("insOut").textContent = "error: " + e.message;
+        }
+      }
 
-async function loadQuality(){
-  const d=await api("/monitoring/data-quality");
-  $("dqChecks").querySelector("tbody").innerHTML=d.checks.map(c=>{
-    const bad=(c.check==='products_without_source')&&c.count>0;const warn=['staged_valid_unpromoted','raw_ok_unstaged','ai_items_failed','incomplete_canonical'].includes(c.check)&&c.count>0;
-    return `<tr><td>${esc(c.check)}<br><span class="cat mut">${esc(c.hint)}</span></td>
-      <td class="r"><span class="badge ${bad?'b-bad':warn?'b-warn':c.count===0?'b-ok':''}">${c.count}</span></td></tr>`;}).join("");
-  const nb=$("dqNulls").querySelector("tbody");
-  nb.innerHTML=d.nullHotspots.length?d.nullHotspots.slice(0,25).map(c=>`<tr>
+      async function loadQuality() {
+        const d = await api("/monitoring/data-quality");
+        $("dqChecks").querySelector("tbody").innerHTML = d.checks
+          .map((c) => {
+            const bad = c.check === "products_without_source" && c.count > 0;
+            const warn =
+              [
+                "staged_valid_unpromoted",
+                "raw_ok_unstaged",
+                "ai_items_failed",
+                "incomplete_canonical",
+              ].includes(c.check) && c.count > 0;
+            return `<tr><td>${esc(c.check)}<br><span class="cat mut">${esc(c.hint)}</span></td>
+      <td class="r"><span class="badge ${bad ? "b-bad" : warn ? "b-warn" : c.count === 0 ? "b-ok" : ""}">${c.count}</span></td></tr>`;
+          })
+          .join("");
+        const nb = $("dqNulls").querySelector("tbody");
+        nb.innerHTML = d.nullHotspots.length
+          ? d.nullHotspots
+              .slice(0, 25)
+              .map(
+                (c) => `<tr>
     <td><span class="mono">${esc(c.table)}.${esc(c.column)}</span></td>
-    <td class="r">${bar(c.nullPct,c.nullPct>=60?'var(--bad)':c.nullPct>=25?'var(--warn)':'var(--dim)')} ${c.nullPct}%</td>
-    <td><span class="badge ${c.nullPct>=60?'b-bad':c.nullPct>=25?'b-warn':'b-info'}">${c.nullPct>=60?'critical':c.nullPct>=25?'high':'ok'}</span></td></tr>`).join(""):'<tr><td colspan="3" class="empty">No nulls in monitored columns.</td></tr>';
-  $("dqDupes").querySelector("tbody").innerHTML=d.duplicates.length?d.duplicates.map(x=>`<tr><td class="mono">${esc(x.table)}</td><td class="r"><span class="badge b-warn">${x.duplicates}</span></td></tr>`).join(""):'<tr><td colspan="2" class="empty">No duplicate business keys. ✅</td></tr>';
-}
+    <td class="r">${bar(c.nullPct, c.nullPct >= 60 ? "var(--bad)" : c.nullPct >= 25 ? "var(--warn)" : "var(--dim)")} ${c.nullPct}%</td>
+    <td><span class="badge ${c.nullPct >= 60 ? "b-bad" : c.nullPct >= 25 ? "b-warn" : "b-info"}">${c.nullPct >= 60 ? "critical" : c.nullPct >= 25 ? "high" : "ok"}</span></td></tr>`,
+              )
+              .join("")
+          : '<tr><td colspan="3" class="empty">No nulls in monitored columns.</td></tr>';
+        $("dqDupes").querySelector("tbody").innerHTML = d.duplicates.length
+          ? d.duplicates
+              .map(
+                (x) =>
+                  `<tr><td class="mono">${esc(x.table)}</td><td class="r"><span class="badge b-warn">${x.duplicates}</span></td></tr>`,
+              )
+              .join("")
+          : '<tr><td colspan="2" class="empty">No duplicate business keys. ✅</td></tr>';
+      }
 
-async function loadAI(){
-  const d=await api("/monitoring/ai-quality");
-  $("aiCards").innerHTML=[
-    ["Rules learned (total)",d.rules.total],["Learned from AI",d.rules.learned_from_ai],["Active rules",d.rules.active],
-    ["AI review runs",d.reviewRuns.length],
-  ].map(([l,v])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join("");
-  $("aiRuns").querySelector("tbody").innerHTML=d.reviewRuns.length?d.reviewRuns.map(r=>`<tr>
+      async function loadAI() {
+        const d = await api("/monitoring/ai-quality");
+        $("aiCards").innerHTML = [
+          ["Rules learned (total)", d.rules.total],
+          ["Learned from AI", d.rules.learned_from_ai],
+          ["Active rules", d.rules.active],
+          ["AI review runs", d.reviewRuns.length],
+        ]
+          .map(([l, v]) => `<div class="card"><b>${v}</b><span>${l}</span></div>`)
+          .join("");
+        $("aiRuns").querySelector("tbody").innerHTML = d.reviewRuns.length
+          ? d.reviewRuns
+              .map(
+                (r) => `<tr>
     <td class="mut">${ago(r.created_at)}</td><td>${esc(r.provider_name)} / <span class="mono">${esc(r.model_name)}</span></td>
     <td>${dot(r.status)}${esc(r.status)}</td><td class="r">${r.total_items}</td><td class="r" style="color:var(--ok)">${r.succeeded_items}</td>
-    <td class="r" style="color:${r.failed_items>0?'var(--bad)':'inherit'}">${r.failed_items}</td><td class="r">${r.suggestions}</td></tr>`).join(""):'<tr><td colspan="7" class="empty">No AI runs yet.</td></tr>';
-  $("aiTrend").querySelector("tbody").innerHTML=d.transformTrend.map(t=>{
-    const vp=t.staged?Math.round((t.valid/t.staged)*100):0;
-    return `<tr><td class="mut">${ago(t.created_at)}</td><td class="r">${t.staged}</td>
-      <td>${bar(vp,vp>=80?'var(--ok)':vp>=50?'var(--warn)':'var(--bad)')} ${vp}%</td>
-      <td class="r">${t.avg_confidence??'—'}</td><td class="r">${t.avg_unresolved??'—'}</td><td class="r">${t.observations}</td></tr>`;}).join("")||'<tr><td colspan="6" class="empty">No transform runs.</td></tr>';
-  $("aiPromo").querySelector("tbody").innerHTML=d.promotionTrend.map(p=>`<tr>
+    <td class="r" style="color:${r.failed_items > 0 ? "var(--bad)" : "inherit"}">${r.failed_items}</td><td class="r">${r.suggestions}</td></tr>`,
+              )
+              .join("")
+          : '<tr><td colspan="7" class="empty">No AI runs yet.</td></tr>';
+        $("aiTrend").querySelector("tbody").innerHTML =
+          d.transformTrend
+            .map((t) => {
+              const vp = t.staged ? Math.round((t.valid / t.staged) * 100) : 0;
+              return `<tr><td class="mut">${ago(t.created_at)}</td><td class="r">${t.staged}</td>
+      <td>${bar(vp, vp >= 80 ? "var(--ok)" : vp >= 50 ? "var(--warn)" : "var(--bad)")} ${vp}%</td>
+      <td class="r">${t.avg_confidence ?? "—"}</td><td class="r">${t.avg_unresolved ?? "—"}</td><td class="r">${t.observations}</td></tr>`;
+            })
+            .join("") || '<tr><td colspan="6" class="empty">No transform runs.</td></tr>';
+        $("aiPromo").querySelector("tbody").innerHTML =
+          d.promotionTrend
+            .map(
+              (p) => `<tr>
     <td class="mut">${ago(p.created_at)}</td><td class="r">${p.total_items}</td>
     <td><span style="color:var(--ok)">${p.promoted_new} new</span> / ${p.matched_existing} matched</td>
-    <td class="r" style="color:${p.failed_items>0?'var(--bad)':'inherit'}">${p.failed_items}</td></tr>`).join("")||'<tr><td colspan="4" class="empty">No promotion runs.</td></tr>';
-}
+    <td class="r" style="color:${p.failed_items > 0 ? "var(--bad)" : "inherit"}">${p.failed_items}</td></tr>`,
+            )
+            .join("") || '<tr><td colspan="4" class="empty">No promotion runs.</td></tr>';
+      }
 
-async function loadRuns(){
-  const limit=$("runLimit").value||60;
-  const {runs}=await api(`/monitoring/runs?limit=${limit}`);
-  $("runsTbl").querySelector("tbody").innerHTML=runs.map(r=>`<tr>
+      async function loadRuns() {
+        const limit = $("runLimit").value || 60;
+        const { runs } = await api(`/monitoring/runs?limit=${limit}`);
+        $("runsTbl").querySelector("tbody").innerHTML =
+          runs
+            .map(
+              (r) => `<tr>
     <td><span class="badge b-info">${esc(r.phase)}</span></td><td class="mut">${ago(r.created_at)}</td>
-    <td>${dot(r.status)}${esc(r.status)}</td><td class="r">${r.input??'—'}</td><td class="r">${r.processed??'—'}</td>
-    <td class="r" style="color:${r.failed>0?'var(--bad)':'inherit'}">${r.failed??'—'}</td>
-    <td class="mut">${dur(r.started_at,r.finished_at)}</td><td class="mut">${esc(r.note||'')}</td></tr>`).join("")||'<tr><td colspan="8" class="empty">No runs.</td></tr>';
-}
-async function loadAlerts(){
-  const {alerts}=await api("/monitoring/alerts");
-  $("alertList").innerHTML=alerts.length?alerts.map(alertRow).join(""):'<div class="empty">No active alerts — pipeline healthy. 🎉</div>';
-}
+    <td>${dot(r.status)}${esc(r.status)}</td><td class="r">${r.input ?? "—"}</td><td class="r">${r.processed ?? "—"}</td>
+    <td class="r" style="color:${r.failed > 0 ? "var(--bad)" : "inherit"}">${r.failed ?? "—"}</td>
+    <td class="mut">${dur(r.started_at, r.finished_at)}</td><td class="mut">${esc(r.note || "")}</td></tr>`,
+            )
+            .join("") || '<tr><td colspan="8" class="empty">No runs.</td></tr>';
+      }
+      async function loadAlerts() {
+        const { alerts } = await api("/monitoring/alerts");
+        $("alertList").innerHTML = alerts.length
+          ? alerts.map(alertRow).join("")
+          : '<div class="empty">No active alerts — pipeline healthy. 🎉</div>';
+      }
 
-go("overview");schedule();
-</script>
-</body>
+      go("overview");
+      schedule();
+    </script>
+  </body>
 </html>

@@ -52,7 +52,12 @@ export async function monitoringRoutes(app: FastifyInstance): Promise<void> {
 
   // Expose the config so the UI can render selectors without hardcoding.
   app.get("/monitoring/config", async () => ({
-    tables: CORE_TABLES.map((t) => ({ table: t.table, label: t.label, layer: t.layer, core: Boolean(t.core) })),
+    tables: CORE_TABLES.map((t) => ({
+      table: t.table,
+      label: t.label,
+      layer: t.layer,
+      core: Boolean(t.core),
+    })),
     phases: PHASES.map((p) => ({ id: p.id, key: p.key, name: p.name })),
   }));
 }

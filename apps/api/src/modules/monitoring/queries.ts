@@ -90,7 +90,9 @@ export async function tableRecords(
     where = conds.length ? `where ${conds.join(" or ")}` : "";
   }
   const rows = (
-    await pool.query(`select * from ${q(cfg.table)} ${where} ${order} limit ${Math.min(limit, 100)}`)
+    await pool.query(
+      `select * from ${q(cfg.table)} ${where} ${order} limit ${Math.min(limit, 100)}`,
+    )
   ).rows;
   return { table, mode, records: rows };
 }
@@ -154,8 +156,18 @@ export async function phaseStatuses(pool: Queryable): Promise<PhaseStatus[]> {
     }
 
     out.push({
-      id: p.id, key: p.key, name: p.name, runTable: p.runTable, lastRunStatus,
-      runs, succeededRuns, failedRuns, processed, failed, outputRows, avgSeconds,
+      id: p.id,
+      key: p.key,
+      name: p.name,
+      runTable: p.runTable,
+      lastRunStatus,
+      runs,
+      succeededRuns,
+      failedRuns,
+      processed,
+      failed,
+      outputRows,
+      avgSeconds,
     });
   }
   return out;
@@ -297,7 +309,11 @@ export async function runHistory(pool: Queryable, limit: number) {
 
 /** Derived alert center. */
 export async function alerts(pool: Queryable) {
-  const items: Array<{ level: "critical" | "warning" | "info"; category: string; message: string }> = [];
+  const items: Array<{
+    level: "critical" | "warning" | "info";
+    category: string;
+    message: string;
+  }> = [];
   const push = (level: "critical" | "warning" | "info", category: string, message: string) =>
     items.push({ level, category, message });
 
@@ -315,7 +331,8 @@ export async function alerts(pool: Queryable) {
 
   const phases = await phaseStatuses(pool);
   for (const p of phases) {
-    if (p.failedRuns > 0) push("warning", "failed_runs", `${p.name}: ${p.failedRuns} failed run(s)`);
+    if (p.failedRuns > 0)
+      push("warning", "failed_runs", `${p.name}: ${p.failedRuns} failed run(s)`);
     if (p.lastRunStatus === "failed") push("critical", "failed_runs", `${p.name}: last run FAILED`);
   }
 
@@ -334,10 +351,15 @@ export async function alerts(pool: Queryable) {
   // AI degradation: latest review run failed% worse than the prior one.
   const aq = await aiQuality(pool);
   if (aq.reviewRuns.length >= 2) {
-    const rate = (r: Record<string, unknown>) => (n(r.total_items) ? n(r.failed_items) / n(r.total_items) : 0);
+    const rate = (r: Record<string, unknown>) =>
+      n(r.total_items) ? n(r.failed_items) / n(r.total_items) : 0;
     const [latest, prev] = aq.reviewRuns;
     if (latest && prev && rate(latest) > rate(prev) && rate(latest) > 0.1)
-      push("warning", "ai", `AI failure rate rose to ${Math.round(rate(latest) * 100)}% in the latest run`);
+      push(
+        "warning",
+        "ai",
+        `AI failure rate rose to ${Math.round(rate(latest) * 100)}% in the latest run`,
+      );
   }
 
   const order = { critical: 0, warning: 1, info: 2 };
@@ -347,23 +369,43 @@ export async function alerts(pool: Queryable) {
 
 export async function overview(pool: Queryable) {
   const one = async (sqlText: string) => n((await pool.query(sqlText)).rows[0]?.c);
-  const [products, brands, categories, types, markets, priceFacts, ratingFacts, openObs, openSug, staged] =
-    await Promise.all([
-      one("select count(*)::bigint c from products_master"),
-      one("select count(*)::bigint c from brands"),
-      one("select count(*)::bigint c from categories"),
-      one("select count(*)::bigint c from product_types"),
-      one("select count(*)::bigint c from markets"),
-      one("select count(*)::bigint c from product_price_facts"),
-      one("select count(*)::bigint c from product_rating_facts"),
-      one("select count(*)::bigint c from transform_observations where status='open'"),
-      one("select count(*)::bigint c from ai_rule_suggestions where status='open'"),
-      one("select count(*)::bigint c from staged_products where validation_status='needs_review'"),
-    ]);
+  const [
+    products,
+    brands,
+    categories,
+    types,
+    markets,
+    priceFacts,
+    ratingFacts,
+    openObs,
+    openSug,
+    staged,
+  ] = await Promise.all([
+    one("select count(*)::bigint c from products_master"),
+    one("select count(*)::bigint c from brands"),
+    one("select count(*)::bigint c from categories"),
+    one("select count(*)::bigint c from product_types"),
+    one("select count(*)::bigint c from markets"),
+    one("select count(*)::bigint c from product_price_facts"),
+    one("select count(*)::bigint c from product_rating_facts"),
+    one("select count(*)::bigint c from transform_observations where status='open'"),
+    one("select count(*)::bigint c from ai_rule_suggestions where status='open'"),
+    one("select count(*)::bigint c from staged_products where validation_status='needs_review'"),
+  ]);
   const alertList = await alerts(pool);
   return {
-    cards: { products, brands, categories, types, markets, priceFacts, ratingFacts,
-      openObservations: openObs, openSuggestions: openSug, stagedNeedsReview: staged },
+    cards: {
+      products,
+      brands,
+      categories,
+      types,
+      markets,
+      priceFacts,
+      ratingFacts,
+      openObservations: openObs,
+      openSuggestions: openSug,
+      stagedNeedsReview: staged,
+    },
     alertCounts: {
       critical: alertList.filter((a) => a.level === "critical").length,
       warning: alertList.filter((a) => a.level === "warning").length,
