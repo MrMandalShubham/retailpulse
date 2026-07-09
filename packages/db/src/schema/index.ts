@@ -41,3 +41,6 @@ export { sourceMarkets, factRuns, productPriceFacts, productRatingFacts } from "
 
 // Enrichment provenance layer (Phase 7) — additive, fill-if-null, review-gated
 export { enrichmentRuns, productEnrichments } from "./enrichment.js";
+
+// Report-intelligence layer (Phase 8) — additive facts + brand provenance
+export { salesFacts, newsFacts, brandFacts } from "./report-intel.js";
