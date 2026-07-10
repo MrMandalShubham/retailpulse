@@ -44,3 +44,6 @@ export { enrichmentRuns, productEnrichments } from "./enrichment.js";
 
 // Report-intelligence layer (Phase 8) — additive facts + brand provenance
 export { salesFacts, newsFacts, brandFacts } from "./report-intel.js";
+
+// Media-store layer (Phase 9) — normalized asset/link/variant model (additive)
+export { mediaAssets, productMediaLinks, mediaVariants } from "./media.js";
