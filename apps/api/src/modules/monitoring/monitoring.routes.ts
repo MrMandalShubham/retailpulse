@@ -5,6 +5,7 @@ import {
   alerts,
   allTableHealth,
   dataQuality,
+  discoveryStats,
   overview,
   phaseStatuses,
   runHistory,
@@ -20,6 +21,7 @@ export async function monitoringRoutes(app: FastifyInstance): Promise<void> {
   const db = () => app.pgPool as unknown as Queryable;
 
   app.get("/monitoring/overview", async () => overview(db()));
+  app.get("/monitoring/discovery", async () => discoveryStats(db()));
   app.get("/monitoring/phases", async () => ({ phases: await phaseStatuses(db()) }));
   app.get("/monitoring/tables", async () => ({ tables: await allTableHealth(db()) }));
   app.get("/monitoring/data-quality", async () => dataQuality(db()));

@@ -367,6 +367,73 @@ export async function alerts(pool: Queryable) {
   return items;
 }
 
+/** Phase 0 (discovery) — per-source mapping, funnel, and recent runs. */
+export async function discoveryStats(pool: Queryable) {
+  const sourceRows = (
+    await pool.query(
+      `select s.name, s.slug, (s.discovery_config->>'strategy') as strategy,
+              count(d.id)::int as total_mapped,
+              count(d.id) filter (where d.discovery_status='confirmed')::int as confirmed,
+              count(d.id) filter (where d.batch_status='pending')::int as pending,
+              count(d.id) filter (where d.batch_status='queued')::int as queued,
+              count(d.id) filter (where d.batch_status='ingested')::int as ingested,
+              count(d.id) filter (where d.batch_status='promoted')::int as promoted,
+              max(d.last_seen_at) as last_seen
+       from sources s
+       left join discovered_product_pages d on d.source_id = s.id
+       where s.discovery_config is not null
+       group by s.id, s.name, s.slug, s.discovery_config
+       order by count(d.id) desc`,
+    )
+  ).rows;
+  const sources = sourceRows.map((r) => ({
+    name: r.name,
+    slug: r.slug,
+    strategy: (r.strategy as string | null) ?? null,
+    totalMapped: n(r.total_mapped),
+    confirmed: n(r.confirmed),
+    pending: n(r.pending),
+    queued: n(r.queued),
+    ingested: n(r.ingested),
+    promoted: n(r.promoted),
+    lastSeen: (r.last_seen as string | null) ?? null,
+  }));
+
+  const recentRuns = (
+    await pool.query(
+      `select coalesce(s.slug, '—') as source, dr.strategy, dr.status,
+              dr.urls_discovered, dr.new_urls, dr.updated_urls, dr.errors, dr.created_at
+       from discovery_runs dr left join sources s on s.id = dr.source_id
+       order by dr.created_at desc limit 12`,
+    )
+  ).rows;
+
+  const t =
+    (
+      await pool.query(
+        `select count(distinct source_id)::int as sources, count(*)::int as mapped,
+                count(*) filter (where discovery_status='confirmed')::int as confirmed,
+                count(*) filter (where batch_status='queued')::int as queued,
+                count(*) filter (where batch_status='promoted')::int as promoted,
+                count(*) filter (where batch_status='pending')::int as pending
+         from discovered_product_pages`,
+      )
+    ).rows[0] ?? {};
+
+  return {
+    totals: {
+      sourcesInDiscovery: n(t.sources),
+      totalMapped: n(t.mapped),
+      confirmed: n(t.confirmed),
+      queued: n(t.queued),
+      promoted: n(t.promoted),
+      pending: n(t.pending),
+    },
+    sources,
+    recentRuns,
+  };
+}
+
 export async function overview(pool: Queryable) {
   const one = async (sqlText: string) => n((await pool.query(sqlText)).rows[0]?.c);
   const [

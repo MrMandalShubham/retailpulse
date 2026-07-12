@@ -61,7 +61,9 @@ describe("monitoring routes — validation & static (no database needed)", () =>
     const body = cfg.json();
     expect(Array.isArray(body.tables)).toBe(true);
     expect(body.tables.some((t: { table: string }) => t.table === "products_master")).toBe(true);
-    expect(body.phases).toHaveLength(6);
+    // Phases: 0 (discovery) + 1..6.
+    expect(body.phases).toHaveLength(7);
+    expect(body.phases.some((p: { key: string }) => p.key === "discovery")).toBe(true);
 
     const page = await app.inject({ method: "GET", url: "/monitoring" });
     expect(page.statusCode).toBe(200);

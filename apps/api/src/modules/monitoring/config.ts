@@ -8,7 +8,7 @@
  * spec asks for — here filled in with DIP Engine's real tables.)
  */
 
-export type Layer = "raw" | "staging" | "ai" | "canonical" | "facts";
+export type Layer = "discovery" | "raw" | "staging" | "ai" | "canonical" | "facts";
 
 export interface TableMonitor {
   table: string;
@@ -25,6 +25,27 @@ export interface TableMonitor {
 }
 
 export const CORE_TABLES: TableMonitor[] = [
+  // ---- Discovery (Phase 0) ----
+  {
+    table: "discovery_runs",
+    label: "Discovery Runs",
+    layer: "discovery",
+    importantColumns: ["strategy", "status"],
+  },
+  {
+    table: "discovered_product_pages",
+    label: "Discovered Product Pages",
+    layer: "discovery",
+    importantColumns: [
+      "product_url",
+      "normalized_url",
+      "url_hash",
+      "discovery_status",
+      "batch_status",
+    ],
+    dedupKey: ["source_id", "url_hash"],
+  },
+
   // ---- Canonical V1 core (the 8) ----
   {
     table: "products_master",
@@ -202,6 +223,18 @@ export interface PhaseMonitor {
 }
 
 export const PHASES: PhaseMonitor[] = [
+  {
+    id: 0,
+    key: "discovery",
+    name: "Product Discovery",
+    runTable: "discovery_runs",
+    statusColumn: "status",
+    startedColumn: "started_at",
+    finishedColumn: "finished_at",
+    processedColumn: "urls_discovered",
+    failedColumn: "errors",
+    outputTable: "discovered_product_pages",
+  },
   {
     id: 1,
     key: "raw_ingestion",

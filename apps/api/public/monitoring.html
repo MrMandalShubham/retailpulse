@@ -324,10 +324,49 @@
       <section class="tab active" id="tab-overview">
         <h2>Summary</h2>
         <div class="cards" id="cards"></div>
-        <h2>Workflow phases (P1 → P6)</h2>
+        <h2>Workflow phases (P0 → P6)</h2>
         <div class="phase" id="phases"></div>
         <h2>Attention</h2>
         <div id="ovAlerts"></div>
+      </section>
+
+      <section class="tab" id="tab-discovery">
+        <h2>Discovery summary</h2>
+        <div class="cards" id="discCards"></div>
+        <h2>Sources in discovery — website · method · catalog mapped</h2>
+        <div class="panel">
+          <table id="discSources">
+            <thead>
+              <tr>
+                <th>Website</th>
+                <th>Method</th>
+                <th class="r">Products mapped</th>
+                <th class="r">Confirmed</th>
+                <th>Ingestion funnel</th>
+                <th>Last seen</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <h2>Recent discovery runs</h2>
+        <div class="panel">
+          <table id="discRuns">
+            <thead>
+              <tr>
+                <th>Website</th>
+                <th>Method</th>
+                <th>Status</th>
+                <th class="r">Discovered</th>
+                <th class="r">New</th>
+                <th class="r">Updated</th>
+                <th class="r">Errors</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="tab" id="tab-tables">
@@ -512,6 +551,7 @@
       };
       const TABS = [
         ["overview", "Overview"],
+        ["discovery", "Phase 0: Discovery"],
         ["tables", "Core Tables"],
         ["quality", "Data Quality"],
         ["ai", "AI Quality"],
@@ -568,6 +608,7 @@
       async function loadTab(k) {
         try {
           if (k === "overview") await loadOverview();
+          else if (k === "discovery") await loadDiscovery();
           else if (k === "tables") await loadTables();
           else if (k === "quality") await loadQuality();
           else if (k === "ai") await loadAI();
@@ -626,6 +667,43 @@
         a,
       ) => `<div class="alert ${a.level}"><span class="badge ${lvlClass(a.level)}">${a.level}</span>
   <div><div>${esc(a.message)}</div><div class="cat">${esc(a.category)}</div></div></div>`;
+
+      async function loadDiscovery() {
+        const d = await api("/monitoring/discovery");
+        const t = d.totals;
+        $("discCards").innerHTML = [
+          ["Websites in discovery", t.sourcesInDiscovery],
+          ["Products mapped", t.totalMapped],
+          ["Confirmed", t.confirmed],
+          ["Queued for ingest", t.queued],
+          ["Reached canonical", t.promoted],
+          ["Pending", t.pending],
+        ]
+          .map(([l, v]) => `<div class="card"><b>${v}</b><span>${l}</span></div>`)
+          .join("");
+        $("discSources").querySelector("tbody").innerHTML = d.sources.length
+          ? d.sources
+              .map((s) => {
+                const funnel = `${s.pending} pending → ${s.queued} queued → ${s.ingested} ingested → <b style="color:var(--ok)">${s.promoted} canonical</b>`;
+                return `<tr><td>${esc(s.name)}<br><span class="mono mut">${esc(s.slug)}</span></td>
+    <td><span class="badge b-info">${esc(s.strategy || "—")}</span></td>
+    <td class="r"><b>${s.totalMapped}</b></td><td class="r">${s.confirmed}</td>
+    <td class="mut">${funnel}</td><td class="mut">${ago(s.lastSeen)}</td></tr>`;
+              })
+              .join("")
+          : '<tr><td colspan="6" class="empty">No sources configured for discovery.</td></tr>';
+        $("discRuns").querySelector("tbody").innerHTML = d.recentRuns.length
+          ? d.recentRuns
+              .map(
+                (r) => `<tr><td>${esc(r.source)}</td><td><span class="badge">${esc(r.strategy)}</span></td>
+    <td>${dot(r.status)}${esc(r.status)}</td><td class="r"><b>${r.urls_discovered}</b></td>
+    <td class="r" style="color:var(--ok)">${r.new_urls}</td><td class="r">${r.updated_urls}</td>
+    <td class="r" style="color:${r.errors > 0 ? "var(--bad)" : "inherit"}">${r.errors}</td>
+    <td class="mut">${ago(r.created_at)}</td></tr>`,
+              )
+              .join("")
+          : '<tr><td colspan="8" class="empty">No discovery runs yet.</td></tr>';
+      }
 
       async function loadTables() {
         const { tables } = await api("/monitoring/tables");
