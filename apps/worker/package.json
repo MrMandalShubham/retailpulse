@@ -14,7 +14,8 @@
     "facts": "tsx src/facts/run.ts",
     "enrich": "tsx src/enrich.ts",
     "render": "tsx src/render.ts",
-    "report": "tsx src/report.ts"
+    "report": "tsx src/report.ts",
+    "discover": "tsx src/discover.ts"
   },
   "dependencies": {
     "@dip/ai": "workspace:*",

@@ -26,7 +26,10 @@
     "facts:run": "pnpm --filter @dip/worker facts",
     "enrich:run": "pnpm --filter @dip/worker enrich",
     "render:run": "pnpm --filter @dip/worker render",
-    "report:run": "pnpm --filter @dip/worker report"
+    "report:run": "pnpm --filter @dip/worker report",
+    "discover:run": "pnpm --filter @dip/worker discover run",
+    "discover:batch": "pnpm --filter @dip/worker discover batch",
+    "discover:backfill": "pnpm --filter @dip/worker discover backfill"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",

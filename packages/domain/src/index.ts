@@ -16,3 +16,4 @@ export * from "./ai-enrichment/index.js";
 export * from "./enrichment/index.js";
 export * from "./report/index.js";
 export * from "./media/index.js";
+export * from "./discovery/index.js";

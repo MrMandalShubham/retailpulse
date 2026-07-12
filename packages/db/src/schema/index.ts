@@ -47,3 +47,6 @@ export { salesFacts, newsFacts, brandFacts } from "./report-intel.js";
 
 // Media-store layer (Phase 9) — normalized asset/link/variant model (additive)
 export { mediaAssets, productMediaLinks, mediaVariants } from "./media.js";
+
+// Product-discovery layer (Phase 0) — sitemap-first mapping, upstream of ingestion
+export { discoveryRuns, discoveredProductPages } from "./discovery.js";

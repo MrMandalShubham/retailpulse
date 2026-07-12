@@ -5,6 +5,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -44,6 +45,9 @@ export const sources = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     scrapeStrategy: text("scrape_strategy"),
+    // Phase 0 (discovery) per-source config: { strategy, sitemapUrl,
+    // productUrlRegex, maxUrls }. Additive; unused by Phases 1+.
+    discoveryConfig: jsonb("discovery_config"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
