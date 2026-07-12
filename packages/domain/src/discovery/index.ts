@@ -57,13 +57,29 @@ export type BatchStatus = (typeof BATCH_STATUSES)[number];
 /** Per-source discovery configuration (stored as jsonb on sources). */
 export interface DiscoveryConfig {
   strategy: DiscoveryStrategy;
+  /** Optional cap on URLs discovered per run (safety). */
+  maxUrls?: number;
+
+  // --- sitemap strategy ---
   /** Explicit sitemap URL; if absent, discovered via robots.txt / /sitemap.xml. */
   sitemapUrl?: string;
   /** Regex a URL must match to count as a confirmed product page. If absent,
    *  discovered URLs are stored as 'candidate' (we can't be sure they're products). */
   productUrlRegex?: string;
-  /** Optional cap on URLs discovered per run (safety). */
-  maxUrls?: number;
+
+  // --- category_crawl strategy (paginated JSON product API) ---
+  /** Product-list API endpoint (POST, JSON). */
+  categoryApiUrl?: string;
+  /** Category ids to page through. */
+  categoryNos?: string[];
+  /** Product URL prefix; the product id is appended (e.g. ".../detail?prdtNo="). */
+  productUrlBase?: string;
+  /** Products requested per page (default 100). */
+  rowsPerPage?: number;
+  /** Extra fields merged into the POST body (site-specific constants). */
+  requestTemplate?: Record<string, unknown>;
+  /** Safety cap on pages per category. */
+  maxPagesPerCategory?: number;
 }
 
 /** Audit row for one discovery execution. */

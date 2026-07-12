@@ -12,6 +12,7 @@ import { config as loadEnv } from "dotenv";
 import pino from "pino";
 import { loadConfig } from "@dip/config";
 import { createDb } from "@dip/db";
+import { postJsonDefault } from "./discovery/category.js";
 import { runDiscoveryCycle } from "./discovery/pipeline.js";
 import { backfillCanonical, batchToSeedUrls, createDiscoveryRepo } from "./discovery/repo.js";
 import { fetchTextDefault } from "./discovery/sitemap.js";
@@ -29,6 +30,7 @@ try {
     const summaries = await runDiscoveryCycle({
       repo,
       fetchText: (url) => fetchTextDefault(url, config.INGEST_FETCH_TIMEOUT_MS),
+      postJson: (url, body) => postJsonDefault(url, body, config.INGEST_FETCH_TIMEOUT_MS),
       logger,
     });
     logger.info({ summaries }, "discovery cycle complete");

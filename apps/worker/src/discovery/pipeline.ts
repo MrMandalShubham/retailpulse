@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type { DiscoveryConfig, DiscoveryMethod, DiscoveryStatus } from "@dip/domain";
 import { normalizeSourceUrl } from "@dip/promotion";
-import { discoverViaSitemap } from "./sitemap.js";
+import { discoverViaCategoryApi } from "./category.js";
+import { type DiscoveredUrl, discoverViaSitemap } from "./sitemap.js";
 
 /**
  * Phase 0a discovery pipeline. For each enabled source with a sitemap
@@ -54,8 +55,11 @@ export interface DiscoveryLogger {
 export interface DiscoveryDeps {
   repo: DiscoveryRepo;
   fetchText(url: string): Promise<string | null>;
+  postJson(url: string, body: unknown): Promise<unknown | null>;
   logger: DiscoveryLogger;
 }
+
+const SUPPORTED: ReadonlySet<string> = new Set(["sitemap", "category_crawl"]);
 
 export interface DiscoverySummary {
   sourceSlug: string;
@@ -77,18 +81,22 @@ export async function runDiscoveryCycle(deps: DiscoveryDeps): Promise<DiscoveryS
 
   for (const source of sources) {
     const cfg = source.discoveryConfig;
-    if (!cfg || cfg.strategy !== "sitemap") {
-      deps.logger.info({ source: source.slug }, "no sitemap discovery_config — skipped");
+    if (!cfg || !SUPPORTED.has(cfg.strategy)) {
+      deps.logger.info({ source: source.slug }, "no supported discovery_config — skipped");
       summaries.push(skip(source.slug));
       continue;
     }
+    const method: DiscoveryMethod = cfg.strategy === "category_crawl" ? "category_crawl" : "sitemap";
 
-    const { id: runId } = await deps.repo.createRun(source.id, "sitemap");
+    const { id: runId } = await deps.repo.createRun(source.id, cfg.strategy);
     try {
-      const urls = await discoverViaSitemap(source.baseUrl, cfg, {
-        fetchText: deps.fetchText,
-        logger: deps.logger,
-      });
+      const urls: DiscoveredUrl[] =
+        cfg.strategy === "category_crawl"
+          ? await discoverViaCategoryApi(cfg, { postJson: deps.postJson, logger: deps.logger })
+          : await discoverViaSitemap(source.baseUrl, cfg, {
+              fetchText: deps.fetchText,
+              logger: deps.logger,
+            });
 
       // Dedup by url_hash (two raw URLs can normalize to the same key).
       const byHash = new Map<string, PageRecord>();
@@ -103,7 +111,7 @@ export async function runDiscoveryCycle(deps: DiscoveryDeps): Promise<DiscoveryS
           productUrl: u.url,
           normalizedUrl,
           urlHash,
-          discoveryMethod: "sitemap",
+          discoveryMethod: method,
           pageTypeConfidence: (u.isProduct ? 0.9 : 0.5).toFixed(3),
           discoveryStatus: u.isProduct ? "confirmed" : "candidate",
           discoveryRunId: runId,
