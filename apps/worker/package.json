@@ -13,7 +13,8 @@
     "promote": "tsx src/promote.ts",
     "facts": "tsx src/facts/run.ts",
     "enrich": "tsx src/enrich.ts",
-    "render": "tsx src/render.ts"
+    "render": "tsx src/render.ts",
+    "report": "tsx src/report.ts"
   },
   "dependencies": {
     "@dip/ai": "workspace:*",

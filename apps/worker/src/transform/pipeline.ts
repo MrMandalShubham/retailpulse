@@ -250,7 +250,9 @@ export function processDocument(
 
   // ---- Local normalization over resolved candidates ----------------------
   const brandRaw = resolution.resolved.get("brand")?.value ?? null;
-  const { brand, brandResolved } = normalizeBrand(brandRaw, engine, master, observations, document);
+  // normalizeBrand still emits an unknown_brand observation (for future alias
+  // learning / canonicalization); a present brand is promotable regardless.
+  const { brand } = normalizeBrand(brandRaw, engine, master, observations, document);
 
   const categoryRaw = resolution.resolved.get("category")?.value ?? null;
   const category = normalizeCategory(categoryRaw, name, engine, master, observations, document);
@@ -306,7 +308,7 @@ export function processDocument(
   const validation = validateStagedProduct({
     pageType: classification.pageType,
     name,
-    brandResolved,
+    brandPresent: Boolean(brand),
     priceTextPresent: Boolean(priceField),
     priceParsed: Boolean(parsedPrice),
     // Only critical-field conflicts gate validation; e.g. meta vs OG

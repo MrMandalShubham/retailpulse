@@ -29,6 +29,8 @@ const envSchema = z.object({
 
   // Raw ingestion worker.
   INGEST_FETCH_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  // Max seed URLs fetched per crawl job (was a hardcoded domain constant).
+  INGEST_MAX_SEED_URLS: z.coerce.number().int().positive().default(5),
 
   // Transform worker: per-run cap on raw documents processed.
   TRANSFORM_MAX_DOCUMENTS: z.coerce.number().int().positive().default(100),

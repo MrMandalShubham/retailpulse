@@ -39,6 +39,7 @@ try {
     logger,
     // Politeness: browser render is heavier; keep a real gap between pages.
     interRequestDelayMs: 1_500,
+    maxSeedUrls: config.INGEST_MAX_SEED_URLS,
   });
   logger.info(summary, "render cycle complete");
   await renderer.close();

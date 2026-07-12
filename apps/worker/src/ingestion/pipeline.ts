@@ -58,6 +58,8 @@ export interface PipelineDeps {
   logger: PipelineLogger;
   /** Politeness delay between requests to the same source. */
   interRequestDelayMs?: number;
+  /** Max seed URLs per job; falls back to the MAX_SEED_URLS_PER_JOB default. */
+  maxSeedUrls?: number;
 }
 
 export interface CycleSummary {
@@ -97,7 +99,7 @@ async function ingestSource(
   deps: PipelineDeps,
   summary: CycleSummary,
 ): Promise<void> {
-  const urls = source.seedUrls.slice(0, MAX_SEED_URLS_PER_JOB);
+  const urls = source.seedUrls.slice(0, deps.maxSeedUrls ?? MAX_SEED_URLS_PER_JOB);
   const { id: jobId } = await deps.repo.createCrawlJob(source.id);
   deps.logger.info({ source: source.slug, jobId, urls: urls.length }, "crawl job started");
 

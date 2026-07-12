@@ -3,7 +3,10 @@ import type { PageType, ValidationStatus } from "@dip/domain";
 export interface ValidationInput {
   pageType: PageType;
   name: string | null;
-  brandResolved: boolean;
+  /** A brand was extracted (present). Whether it already exists in master data
+   *  is NOT required — promotion find-or-creates brands idempotently by slug, so
+   *  a new source's genuinely-new brands must still be promotable. */
+  brandPresent: boolean;
   priceTextPresent: boolean;
   priceParsed: boolean;
   conflicts: string[];
@@ -50,7 +53,7 @@ export function validateStagedProduct(input: ValidationInput): ValidationResult 
   if (errors.length > 0 || criticalUnresolved.length > 0 || input.pageType === "unknown") {
     return { status: "needs_review", errors };
   }
-  if (input.confidenceScore >= 0.7 && input.brandResolved) {
+  if (input.confidenceScore >= 0.7 && input.brandPresent) {
     return { status: "valid", errors };
   }
   return { status: "needs_review", errors };

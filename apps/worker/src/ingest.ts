@@ -31,6 +31,7 @@ try {
     fetchUrl: (url) => fetchUrl(url, { timeoutMs: config.INGEST_FETCH_TIMEOUT_MS }),
     logger,
     interRequestDelayMs: 1_000,
+    maxSeedUrls: config.INGEST_MAX_SEED_URLS,
   });
   logger.info(summary, "ingestion cycle complete");
   await pool.end();
