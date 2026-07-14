@@ -341,7 +341,6 @@
                 <th>Website</th>
                 <th>Method</th>
                 <th class="r">Products mapped</th>
-                <th class="r">Confirmed</th>
                 <th>Ingestion funnel</th>
                 <th>Last seen</th>
               </tr>
@@ -674,7 +673,6 @@
         $("discCards").innerHTML = [
           ["Websites in discovery", t.sourcesInDiscovery],
           ["Products mapped", t.totalMapped],
-          ["Confirmed", t.confirmed],
           ["Queued for ingest", t.queued],
           ["Reached canonical", t.promoted],
           ["Pending", t.pending],
@@ -687,11 +685,11 @@
                 const funnel = `${s.pending} pending → ${s.queued} queued → ${s.ingested} ingested → <b style="color:var(--ok)">${s.promoted} canonical</b>`;
                 return `<tr><td>${esc(s.name)}<br><span class="mono mut">${esc(s.slug)}</span></td>
     <td><span class="badge b-info">${esc(s.strategy || "—")}</span></td>
-    <td class="r"><b>${s.totalMapped}</b></td><td class="r">${s.confirmed}</td>
+    <td class="r"><b>${s.totalMapped}</b></td>
     <td class="mut">${funnel}</td><td class="mut">${ago(s.lastSeen)}</td></tr>`;
               })
               .join("")
-          : '<tr><td colspan="6" class="empty">No sources configured for discovery.</td></tr>';
+          : '<tr><td colspan="5" class="empty">No sources configured for discovery.</td></tr>';
         $("discRuns").querySelector("tbody").innerHTML = d.recentRuns.length
           ? d.recentRuns
               .map(

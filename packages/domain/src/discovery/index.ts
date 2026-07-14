@@ -2,20 +2,19 @@
  * Product-discovery domain (Phase 0) — vocabularies + contracts for the thin,
  * upstream "map product pages before ingesting" layer.
  *
- * Slice 0a is sitemap-first and DETERMINISTIC: robots.txt + sitemap discovery →
- * normalize + hash URLs → upsert a lightweight mapping row. It does NOT extract,
- * normalize product fields, enrich, or promote — it only answers "which product
- * pages exist, and where are they in the ingestion lifecycle".
+ * Phase 0 is a lean MAP: for each source it answers "which product pages exist
+ * (id + name + url), and where is each in the ingestion lifecycle". It does NOT
+ * extract, normalize product fields, enrich, or promote.
  *
- * Two orthogonal status axes (deliberate):
- *  - discovery_status: is this actually a product page?  candidate → confirmed /
- *    rejected / stale
- *  - batch_status: where is it in the ingestion lifecycle? pending → queued →
- *    ingested → promoted / failed / skipped
+ * The map row is deliberately 8 columns. Identity is (source_id, product_id) —
+ * the source's own native product id. The join key to canonical is
+ * normalized_url (via @dip/promotion normalizeSourceUrl — the SAME normalizer
+ * product_sources uses), so a discovered page links to its canonical product
+ * after promotion. One status axis: batch_status (the ingestion lifecycle).
  */
 
-/** How a source is discovered. Only 'sitemap' is implemented in slice 0a;
- *  the rest are reserved so later slices slot in without a schema change. */
+/** How a source is discovered. sitemap + category_crawl are implemented; the
+ *  rest are reserved so later strategies slot in without a schema change. */
 export const DISCOVERY_STRATEGIES = [
   "sitemap",
   "category_crawl",
@@ -25,25 +24,10 @@ export const DISCOVERY_STRATEGIES = [
 ] as const;
 export type DiscoveryStrategy = (typeof DISCOVERY_STRATEGIES)[number];
 
-/** How an individual page URL was found. */
-export const DISCOVERY_METHODS = [
-  "sitemap",
-  "category_crawl",
-  "pagination",
-  "js_render",
-  "manual",
-  "ai_verified",
-] as const;
-export type DiscoveryMethod = (typeof DISCOVERY_METHODS)[number];
-
 export const DISCOVERY_RUN_STATUSES = ["pending", "running", "succeeded", "failed"] as const;
 export type DiscoveryRunStatus = (typeof DISCOVERY_RUN_STATUSES)[number];
 
-/** Axis 1 — is this a real product page? */
-export const DISCOVERY_STATUSES = ["candidate", "confirmed", "rejected", "stale"] as const;
-export type DiscoveryStatus = (typeof DISCOVERY_STATUSES)[number];
-
-/** Axis 2 — ingestion lifecycle of a discovered page. */
+/** The ingestion lifecycle of a discovered page (the map's one status axis). */
 export const BATCH_STATUSES = [
   "pending",
   "queued",
@@ -99,27 +83,20 @@ export interface DiscoveryRun {
   updatedAt: string;
 }
 
-/** One discovered product page (the mapping/queue row). */
+/**
+ * One discovered product page — the lean Phase 0 map/queue row (8 columns).
+ *  - Identity: (sourceId, productId) — the source's own native product id.
+ *  - productUrl: the page the ingestion pipeline visits to scrape.
+ *  - normalizedUrl: canonical form; dedup + join key to product_sources.source_url.
+ *  - batchStatus: the ingestion lifecycle (pending → queued → ingested → promoted).
+ */
 export interface DiscoveredProductPage {
   id: string;
   sourceId: string;
-  sourceSlug: string | null;
-  discoveredProductName: string | null;
+  productId: string;
+  productName: string | null;
   productUrl: string;
   normalizedUrl: string;
-  urlHash: string;
-  discoveryMethod: DiscoveryMethod;
-  pageTypeConfidence: number | null;
-  crawlDepth: number;
-  parentListingUrl: string | null;
-  candidateMarketId: string | null;
-  discoveryStatus: DiscoveryStatus;
   batchStatus: BatchStatus;
-  canonicalProductId: string | null;
-  discoveryRunId: string | null;
-  errorReason: string | null;
-  firstSeenAt: string;
-  lastSeenAt: string;
   createdAt: string;
-  updatedAt: string;
 }

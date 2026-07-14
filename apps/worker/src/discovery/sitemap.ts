@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { DiscoveryConfig } from "@dip/domain";
 import { fetchUrl } from "../ingestion/fetcher.js";
 
@@ -9,10 +10,32 @@ import { fetchUrl } from "../ingestion/fetcher.js";
  */
 
 export interface DiscoveredUrl {
+  /** The source's native product id (dedup + identity key). */
+  productId: string;
   url: string;
   name: string | null;
   /** true when a productUrlRegex confirmed this is a product page. */
   isProduct: boolean;
+}
+
+/**
+ * Best-effort native product id from a URL: a common id query param, else the
+ * last path segment, else a short stable hash. Sitemaps rarely expose a clean
+ * id, so a URL-derived id is the honest identity for sitemap-discovered pages.
+ */
+export function deriveProductId(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const key of ["prdtNo", "productId", "productCode", "id", "sku"]) {
+      const v = u.searchParams.get(key);
+      if (v) return v;
+    }
+    const seg = u.pathname.split("/").filter(Boolean).pop();
+    if (seg) return decodeURIComponent(seg);
+  } catch {
+    /* fall through to hash */
+  }
+  return createHash("sha1").update(url).digest("hex").slice(0, 16);
 }
 
 export interface SitemapDeps {
@@ -96,7 +119,8 @@ export async function discoverViaSitemap(
       const isProduct = productRe ? productRe.test(loc) : false;
       // With no productUrlRegex we can't confirm a product — keep as candidate.
       if (productRe && !isProduct) continue; // filter out non-product URLs when a regex exists
-      if (!pages.has(loc)) pages.set(loc, { url: loc, name: null, isProduct });
+      if (!pages.has(loc))
+        pages.set(loc, { productId: deriveProductId(loc), url: loc, name: null, isProduct });
     }
   }
   return [...pages.values()];

@@ -373,12 +373,11 @@ export async function discoveryStats(pool: Queryable) {
     await pool.query(
       `select s.name, s.slug, (s.discovery_config->>'strategy') as strategy,
               count(d.id)::int as total_mapped,
-              count(d.id) filter (where d.discovery_status='confirmed')::int as confirmed,
               count(d.id) filter (where d.batch_status='pending')::int as pending,
               count(d.id) filter (where d.batch_status='queued')::int as queued,
               count(d.id) filter (where d.batch_status='ingested')::int as ingested,
               count(d.id) filter (where d.batch_status='promoted')::int as promoted,
-              max(d.last_seen_at) as last_seen
+              max(d.created_at) as last_seen
        from sources s
        left join discovered_product_pages d on d.source_id = s.id
        where s.discovery_config is not null
@@ -391,7 +390,6 @@ export async function discoveryStats(pool: Queryable) {
     slug: r.slug,
     strategy: (r.strategy as string | null) ?? null,
     totalMapped: n(r.total_mapped),
-    confirmed: n(r.confirmed),
     pending: n(r.pending),
     queued: n(r.queued),
     ingested: n(r.ingested),
@@ -412,7 +410,6 @@ export async function discoveryStats(pool: Queryable) {
     (
       await pool.query(
         `select count(distinct source_id)::int as sources, count(*)::int as mapped,
-                count(*) filter (where discovery_status='confirmed')::int as confirmed,
                 count(*) filter (where batch_status='queued')::int as queued,
                 count(*) filter (where batch_status='promoted')::int as promoted,
                 count(*) filter (where batch_status='pending')::int as pending
@@ -424,7 +421,6 @@ export async function discoveryStats(pool: Queryable) {
     totals: {
       sourcesInDiscovery: n(t.sources),
       totalMapped: n(t.mapped),
-      confirmed: n(t.confirmed),
       queued: n(t.queued),
       promoted: n(t.promoted),
       pending: n(t.pending),

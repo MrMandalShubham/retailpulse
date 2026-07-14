@@ -71,6 +71,13 @@
       "when": 1783828041814,
       "tag": "0009_discovery",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783988287456,
+      "tag": "0010_lean_discovered_pages",
+      "breakpoints": true
     }
   ]
 }

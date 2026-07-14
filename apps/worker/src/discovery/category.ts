@@ -97,7 +97,12 @@ export async function discoverViaCategoryApi(
         const f = h?.fields ?? {};
         const prdtNo = firstStr(f.prdtNo);
         if (!prdtNo || pages.has(prdtNo)) continue;
-        pages.set(prdtNo, { url: base + prdtNo, name: firstStr(f.prdtName), isProduct: true });
+        pages.set(prdtNo, {
+          productId: prdtNo,
+          url: base + prdtNo,
+          name: firstStr(f.prdtName),
+          isProduct: true,
+        });
       }
       deps.logger.info({ ctgrNo, pageNum, hits: hits.length, total: pages.size }, "category page");
       if (hits.length < rows) break; // last page for this category

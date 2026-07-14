@@ -1,7 +1,7 @@
 /**
- * Phase 0a — product discovery CLI (sitemap-first, deterministic).
+ * Phase 0 — product discovery CLI (sitemap + category-crawl, deterministic).
  *   pnpm discover:run                       discover + map product URLs
- *   pnpm discover:batch <sourceSlug> [n]    queue up to n confirmed pages into seed_urls
+ *   pnpm discover:batch <sourceSlug> [n]    queue up to n pending pages into seed_urls
  *   pnpm discover:backfill                   link discovered pages to canonical products
  *
  * Thin by design: discovers and maps only. Handoff is the existing

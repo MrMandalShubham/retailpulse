@@ -43,29 +43,20 @@ export function createDiscoveryRepo(db: Db): DiscoveryRepo {
           .values(
             chunk.map((r) => ({
               sourceId: r.sourceId,
-              sourceSlug: r.sourceSlug,
-              discoveredProductName: r.discoveredProductName,
+              productId: r.productId,
+              productName: r.productName,
               productUrl: r.productUrl,
               normalizedUrl: r.normalizedUrl,
-              urlHash: r.urlHash,
-              discoveryMethod: r.discoveryMethod,
-              pageTypeConfidence: r.pageTypeConfidence,
-              discoveryStatus: r.discoveryStatus,
-              discoveryRunId: r.discoveryRunId,
             })),
           )
-          // Idempotent: re-discovery only bumps last_seen_at + run id; it never
-          // resets a page's discovery_status or batch_status (preserve lifecycle).
+          // Idempotent: re-discovery refreshes name/url; it never resets
+          // batch_status (preserve the ingestion lifecycle).
           .onConflictDoUpdate({
-            target: [dpp.sourceId, dpp.urlHash],
+            target: [dpp.sourceId, dpp.productId],
             set: {
-              lastSeenAt: new Date(),
-              discoveryRunId: sql`excluded.discovery_run_id`,
-              // Reactivate a page that had gone stale but reappeared; otherwise
-              // preserve its lifecycle (queued/promoted/rejected stay as-is).
-              discoveryStatus: sql`case when ${dpp.discoveryStatus} = 'stale'
-                then excluded.discovery_status else ${dpp.discoveryStatus} end`,
-              updatedAt: new Date(),
+              productName: sql`excluded.product_name`,
+              productUrl: sql`excluded.product_url`,
+              normalizedUrl: sql`excluded.normalized_url`,
             },
           })
           .returning({ isNew: sql<boolean>`(xmax = 0)` });
@@ -75,20 +66,6 @@ export function createDiscoveryRepo(db: Db): DiscoveryRepo {
         }
       }
       return { newCount, updatedCount };
-    },
-
-    async markStale(sourceId, runId) {
-      // Robust: a page not touched by THIS run has a different discovery_run_id.
-      // (Avoids comparing DB now() against a client-generated timestamp.)
-      const res = await db.execute(sql`
-        update discovered_product_pages
-        set discovery_status = 'stale', updated_at = now()
-        where source_id = ${sourceId}
-          and discovery_run_id is distinct from ${runId}
-          and discovery_status in ('candidate','confirmed')
-          and batch_status = 'pending'
-      `);
-      return res.rowCount ?? 0;
     },
 
     async finishRun(runId, status, counters, errorMessage) {
@@ -109,26 +86,24 @@ export function createDiscoveryRepo(db: Db): DiscoveryRepo {
 }
 
 /**
- * Backfill: link discovered pages to their canonical product once promotion has
- * created a product_source with the same normalized URL. Idempotent.
+ * Backfill: mark discovered pages 'promoted' once promotion has created a
+ * product_source with the same normalized URL (the canonical link). Idempotent.
  */
 export async function backfillCanonical(db: Db): Promise<number> {
   const res = await db.execute(sql`
     update discovered_product_pages dpp
-    set canonical_product_id = ps.product_id,
-        batch_status = 'promoted',
-        updated_at = now()
+    set batch_status = 'promoted'
     from product_sources ps
     where dpp.normalized_url = ps.source_url
-      and dpp.canonical_product_id is null
+      and dpp.batch_status <> 'promoted'
   `);
   return res.rowCount ?? 0;
 }
 
 /**
- * Batch handoff: take up to `limit` confirmed + pending pages for a source that
- * are NOT already in product_sources, write them into sources.seed_urls, and
- * mark them queued. The existing render/ingest flow reads seed_urls unchanged.
+ * Batch handoff: take up to `limit` pending pages for a source that are NOT
+ * already in product_sources, write them into sources.seed_urls, and mark them
+ * queued. The existing render/ingest flow reads seed_urls unchanged.
  */
 export async function batchToSeedUrls(
   db: Db,
@@ -149,12 +124,11 @@ export async function batchToSeedUrls(
     .where(
       and(
         eq(dpp.sourceId, source.id),
-        eq(dpp.discoveryStatus, "confirmed"),
         eq(dpp.batchStatus, "pending"),
         sql`not exists (select 1 from product_sources ps where ps.source_url = ${dpp.normalizedUrl})`,
       ),
     )
-    .orderBy(dpp.firstSeenAt)
+    .orderBy(dpp.createdAt)
     .limit(limit);
 
   if (pending.length === 0) return { queued: 0, urls: [], sourceId: source.id };
@@ -164,7 +138,7 @@ export async function batchToSeedUrls(
     await tx.update(schema.sources).set({ seedUrls: urls }).where(eq(schema.sources.id, source.id));
     await tx
       .update(dpp)
-      .set({ batchStatus: "queued", updatedAt: new Date() })
+      .set({ batchStatus: "queued" })
       .where(inArray(dpp.id, pending.map((p) => p.id)));
   });
   return { queued: urls.length, urls, sourceId: source.id };

@@ -36,14 +36,8 @@ export const CORE_TABLES: TableMonitor[] = [
     table: "discovered_product_pages",
     label: "Discovered Product Pages",
     layer: "discovery",
-    importantColumns: [
-      "product_url",
-      "normalized_url",
-      "url_hash",
-      "discovery_status",
-      "batch_status",
-    ],
-    dedupKey: ["source_id", "url_hash"],
+    importantColumns: ["product_id", "product_name", "product_url", "normalized_url", "batch_status"],
+    dedupKey: ["source_id", "product_id"],
   },
 
   // ---- Canonical V1 core (the 8) ----
