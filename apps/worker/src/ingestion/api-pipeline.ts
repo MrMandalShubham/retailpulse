@@ -117,6 +117,31 @@ export async function runApiIngestionCycle(deps: ApiPipelineDeps): Promise<ApiCy
           errorMessage: null,
           fetchedAt,
         });
+        // Raw page HTML — extra evidence stored alongside (own pointer row).
+        // Best-effort: a failed page fetch never blocks the envelope.
+        if (result.htmlBytes) {
+          const htmlKey = buildProductRawKey({
+            sourceSlug: source.slug,
+            crawlJobId: jobId,
+            productId: product.productId,
+            fetchedAt,
+            extension: "html",
+          });
+          await deps.storage.put(htmlKey, result.htmlBytes, "text/html");
+          await deps.repo.insertRawDocument({
+            crawlJobId: jobId,
+            sourceId: source.id,
+            url: product.productUrl,
+            contentType: "text/html",
+            storageKey: htmlKey,
+            checksum: sha256Hex(result.htmlBytes),
+            status: "ok",
+            httpStatus: result.htmlStatus,
+            responseBytes: result.htmlBytes.byteLength,
+            errorMessage: null,
+            fetchedAt,
+          });
+        }
         ingestedIds.push(product.id);
         documentsOk += 1;
       } else {

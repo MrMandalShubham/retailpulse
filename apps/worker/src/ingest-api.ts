@@ -17,7 +17,7 @@ import { getSpacesConfig, loadConfig } from "@dip/config";
 import { createDb } from "@dip/db";
 import { createSpacesStorage } from "@dip/storage";
 import { createApiIngestionRepo, runApiIngestionCycle } from "./ingestion/api-pipeline.js";
-import { defaultPostJson, fetchOliveYoungProduct } from "./ingestion/oliveyoung.js";
+import { defaultGetHtml, defaultPostJson, fetchOliveYoungProduct } from "./ingestion/oliveyoung.js";
 
 loadEnv({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
@@ -40,6 +40,7 @@ try {
     fetchProduct: (productId, productUrl) =>
       fetchOliveYoungProduct(productId, productUrl, slug, {
         postJson: (url, body) => defaultPostJson(url, body, config.INGEST_FETCH_TIMEOUT_MS),
+        getHtml: (url) => defaultGetHtml(url, config.INGEST_FETCH_TIMEOUT_MS),
       }),
     logger,
     sourceSlug: slug,

@@ -25,18 +25,20 @@ export function buildRawStorageKey(input: {
 }
 
 /**
- * Storage key for an API-ingested product raw envelope, keyed by the source's
+ * Storage key for an API-ingested product raw artifact, keyed by the source's
  * native product id so the bucket stays human-browsable:
- *   raw/{source_slug}/{yyyy-mm-dd}/{crawl_job_id}/{product_id}.json
- * Uncompressed (.json) by design — see the gzip-at-end-of-flow decision.
+ *   raw/{source_slug}/{yyyy-mm-dd}/{crawl_job_id}/{product_id}.{json|html}
+ * (.json = the verbatim API envelope; .html = the raw page evidence.)
+ * Uncompressed by design — see the gzip-at-end-of-flow decision.
  */
 export function buildProductRawKey(input: {
   sourceSlug: string;
   crawlJobId: string;
   productId: string;
   fetchedAt: Date;
+  extension?: "json" | "html";
 }): string {
   const day = input.fetchedAt.toISOString().slice(0, 10);
   const safeId = input.productId.replace(/[^a-zA-Z0-9_-]/g, "_");
-  return `raw/${input.sourceSlug}/${day}/${input.crawlJobId}/${safeId}.json`;
+  return `raw/${input.sourceSlug}/${day}/${input.crawlJobId}/${safeId}.${input.extension ?? "json"}`;
 }
