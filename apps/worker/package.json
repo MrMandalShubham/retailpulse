@@ -8,6 +8,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "ingest": "tsx src/ingest.ts",
+    "ingest-api": "tsx src/ingest-api.ts",
     "transform": "tsx src/transform/run.ts",
     "ai-review": "tsx src/ai-review/run.ts",
     "promote": "tsx src/promote.ts",

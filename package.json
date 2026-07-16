@@ -20,6 +20,7 @@
     "db:studio": "pnpm --filter @dip/db studio",
     "bucket:ensure": "pnpm --filter @dip/storage ensure-bucket",
     "ingest:run": "pnpm --filter @dip/worker ingest",
+    "ingest:api": "pnpm --filter @dip/worker ingest-api",
     "transform:run": "pnpm --filter @dip/worker transform",
     "ai-review:run": "pnpm --filter @dip/worker ai-review",
     "promote:run": "pnpm --filter @dip/worker promote",
