@@ -5,9 +5,10 @@ import {
   type RawStorageAdapter,
   type ValidationStatus,
 } from "@dip/domain";
-import { classifyPageType } from "./classify/page-type.js";
+import { classifyPageType, type PageClassification } from "./classify/page-type.js";
 import { dominantMethod, recordConfidence, resolveAllFields } from "./classify/confidence.js";
 import { validateStagedProduct } from "./classify/validate.js";
+import { extractFromEnvelope, tryParseEnvelope } from "./extract/envelope.js";
 import { extractFromHtml, type HtmlExtraction } from "./extract/html.js";
 import { bestMatch } from "./normalize/fuzzy.js";
 import { parsePriceText } from "./normalize/price.js";
@@ -221,8 +222,16 @@ export function processDocument(
   engine: RuleEngine,
   master: MasterData,
 ): DocumentResult {
-  const extraction = extractFromHtml(html, document.url, engine);
-  const classification = classifyPageType(extraction.signals);
+  // Phase 1 direct-API envelopes short-circuit page classification: an
+  // envelope is a product record by construction (built from the source's own
+  // product APIs), so its page type is 'product' with a dedicated signal.
+  const envelope = tryParseEnvelope(html);
+  const extraction = envelope
+    ? extractFromEnvelope(envelope, document.url)
+    : extractFromHtml(html, document.url, engine);
+  const classification: PageClassification = envelope
+    ? { pageType: "product", dominantSignal: "api_envelope", score: 1 }
+    : classifyPageType(extraction.signals);
   const resolution = resolveAllFields(extraction.candidates);
   const observations: ObservationDraft[] = [];
 
@@ -257,7 +266,10 @@ export function processDocument(
   const categoryRaw = resolution.resolved.get("category")?.value ?? null;
   const category = normalizeCategory(categoryRaw, name, engine, master, observations, document);
 
-  const productType = engine.productTypeFor(name ?? "");
+  // Rule-derived product type first (learned knowledge), else the source's own
+  // taxonomy leaf (api_json envelopes carry it as a first-party candidate).
+  const productType =
+    engine.productTypeFor(name ?? "") ?? resolution.resolved.get("product_type")?.value ?? null;
   if (!productType && name && classification.pageType === "product") {
     observations.push({
       rawDocumentId: document.id,

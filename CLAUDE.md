@@ -152,6 +152,19 @@ queries (no summary tables; STALE_FACT_DAYS=30). Endpoints: /facts/_,
 /markets_, /freshness/stats, /coverage/stats, /sources/:id/health|coverage;
 dashboard gained a Facts & Freshness panel + fact timelines in product detail.
 
+**Direct-API ingestion rework (2026-07):** Phase 0 discovery maps a source's
+full catalog into the lean 8-column `discovered_product_pages`
+(identity `(source_id, product_id)`; batch_status lifecycle). Phase 1
+(`pnpm ingest:api`) fetches each pending product's raw JSON envelope from the
+source's own APIs (Olive Young: detail-data + details-info + review-summary,
+see `playbooks/`) plus the page HTML as evidence — stored verbatim and
+UNCOMPRESSED (gzip is a deferred end-of-flow archival step). The transform
+recognises envelopes (`api_json` method, weight 0.98, dominant_signal
+`api_envelope`), maps the source taxonomy path to category + product_type, and
+feeds rating/price into the fact layer — both `retail_pulse_prices` AND
+`voice_pulse_reviews` now fill from envelope data. HTML docs are skipped when a
+JSON envelope exists for the same URL.
+
 **Explicitly OUT of scope until instructed (Phase 7+):** public consumer
 website, embeddings/semantic/vector search, chat/end-user AI features,
 recommendation engines, currency conversion / 'derived' facts, real

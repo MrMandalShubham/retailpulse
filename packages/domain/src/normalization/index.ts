@@ -18,6 +18,7 @@ export const PAGE_TYPES = ["product", "listing", "non_product", "unknown"] as co
 export type PageType = (typeof PAGE_TYPES)[number];
 
 export const EXTRACTION_METHODS = [
+  "api_json",
   "jsonld",
   "opengraph",
   "meta_tags",
@@ -65,6 +66,9 @@ export const GLOBAL_RULE_SCOPE = "global";
  * "mixed" is a record-level label only, never a candidate method.
  */
 export const METHOD_WEIGHTS: Record<ExtractionMethod, number> = {
+  // First-party structured API data (Phase 1 envelopes) — the site's own
+  // source of truth, above any page-derived signal.
+  api_json: 0.98,
   jsonld: 0.9,
   rule_inferred: 0.85,
   opengraph: 0.75,

@@ -7,6 +7,7 @@ import {
   inArray,
   isNotNull,
   notExists,
+  or,
   schema,
   sql,
   type Db,
@@ -28,7 +29,19 @@ export function createTransformRepo(db: Db): TransformRepo {
       const conditions = [
         eq(schema.rawDocuments.status, "ok"),
         isNotNull(schema.rawDocuments.storageKey),
-        ilike(schema.rawDocuments.contentType, "%html%"),
+        // Eligible: JSON envelopes (Phase 1 direct-API) and HTML pages — but an
+        // HTML doc is only page EVIDENCE when a JSON envelope exists for the
+        // same URL; the envelope supersedes it, so the twin is skipped.
+        or(
+          ilike(schema.rawDocuments.contentType, "%json%"),
+          and(
+            ilike(schema.rawDocuments.contentType, "%html%"),
+            sql`not exists (select 1 from raw_documents rj
+                 where rj.url = ${schema.rawDocuments.url}
+                   and rj.status = 'ok' and rj.storage_key is not null
+                   and rj.content_type ilike '%json%')`,
+          ),
+        ),
       ];
       if (!reprocess) {
         // Unprocessed = no staged row AND no observation derived from the doc.
