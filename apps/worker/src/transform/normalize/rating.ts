@@ -35,10 +35,15 @@ export function parseRatingText(rawInput: string | null | undefined): ParsedRati
   if (rating === null || !Number.isFinite(rating) || rating < 0 || rating > 5) return null;
 
   let reviewCount: number | null = null;
-  const countMatch = raw.match(/\(?\s*([\d,]{2,})\s*\)?\s*(?:reviews?|ratings?)?/i);
-  if (countMatch?.[1]) {
-    const count = Number.parseInt(countMatch[1].replace(/,/g, ""), 10);
-    // Avoid mistaking the rating itself for a count.
+  // An explicit "N reviews/ratings" label is unambiguous — accept any N ≥ 1.
+  const labeled = raw.match(/([\d,]+)\s*(?:reviews?|ratings?)\b/i);
+  // A bare number is only trusted above 5 (else it could be the rating itself).
+  const bare = raw.match(/\(?\s*([\d,]{2,})\s*\)?/);
+  if (labeled?.[1]) {
+    const count = Number.parseInt(labeled[1].replace(/,/g, ""), 10);
+    if (Number.isInteger(count) && count >= 1) reviewCount = count;
+  } else if (bare?.[1]) {
+    const count = Number.parseInt(bare[1].replace(/,/g, ""), 10);
     if (Number.isInteger(count) && count > 5) reviewCount = count;
   }
 

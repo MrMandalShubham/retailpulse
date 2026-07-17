@@ -287,6 +287,11 @@ export function processDocument(
   const parsedPrice = parsePriceText(priceField?.value, engine.currencySymbolMap());
   const currency =
     parsedPrice?.currency ?? resolution.resolved.get("currency")?.value?.toUpperCase() ?? null;
+  // Promo/sale price (api_json envelopes carry regular + promo separately).
+  const parsedPromo = parsePriceText(
+    resolution.resolved.get("promo_price_text")?.value,
+    engine.currencySymbolMap(),
+  );
   if (priceField?.conflict) {
     observations.push({
       rawDocumentId: document.id,
@@ -355,8 +360,11 @@ export function processDocument(
       category,
       productType,
       parsedPrice,
+      parsedPromo,
       currency,
       parsedRating,
+      barcode: resolution.resolved.get("barcode")?.value ?? null,
+      sku: resolution.resolved.get("sku")?.value ?? null,
       image: resolution.resolved.get("image")?.value ?? null,
       url: stripTracking(document.url),
     }),
@@ -438,11 +446,19 @@ function buildNormalizedPayload(input: {
   category: string | null;
   productType: string | null;
   parsedPrice: { value: number; currency: string | null; raw: string } | null;
+  parsedPromo: { value: number; currency: string | null; raw: string } | null;
   currency: string | null;
   parsedRating: { rating: number; reviewCount: number | null; raw: string } | null;
+  barcode: string | null;
+  sku: string | null;
   image: string | null;
   url: string;
 }): Record<string, unknown> {
+  // Promo is only meaningful below the regular price.
+  const promoValue =
+    input.parsedPrice && input.parsedPromo && input.parsedPromo.value < input.parsedPrice.value
+      ? input.parsedPromo.value
+      : null;
   return {
     name: input.name,
     brand: input.brand,
@@ -450,7 +466,12 @@ function buildNormalizedPayload(input: {
     productType: input.productType,
     // Shaped so it can be lifted into staged_product_offers mechanically later.
     price: input.parsedPrice
-      ? { value: input.parsedPrice.value, currency: input.currency, raw: input.parsedPrice.raw }
+      ? {
+          value: input.parsedPrice.value,
+          currency: input.currency,
+          raw: input.parsedPrice.raw,
+          ...(promoValue !== null ? { promoValue } : {}),
+        }
       : null,
     rating: input.parsedRating
       ? {
@@ -459,6 +480,8 @@ function buildNormalizedPayload(input: {
           raw: input.parsedRating.raw,
         }
       : null,
+    barcode: input.barcode,
+    sku: input.sku,
     image: input.image,
     url: input.url,
   };

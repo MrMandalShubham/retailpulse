@@ -54,6 +54,9 @@ interface StagedPayload {
   price: { value: number; currency: string | null } | null;
   rating: { value: number } | null;
   image: string | null;
+  /** Source-native identifiers (api_json envelopes): GTIN + product number. */
+  barcode: string | null;
+  sku: string | null;
 }
 
 export interface PromotionService {
@@ -253,7 +256,14 @@ async function selectCandidates(db: Db, limit: number): Promise<StagedCandidate[
         ),
       ),
     )
-    .orderBy(desc(schema.stagedProducts.createdAt))
+    // Highest-trust evidence first: when the same product is staged from both
+    // an api_json envelope (~0.97) and an older page render (~0.85), the
+    // envelope must create the canonical record; the weaker twin then lands in
+    // the ambiguous band and stays staged.
+    .orderBy(
+      sql`${schema.stagedProducts.confidenceScore} desc nulls last`,
+      desc(schema.stagedProducts.createdAt),
+    )
     .limit(limit);
   return rows;
 }
@@ -478,6 +488,8 @@ async function insertProduct(
       slug,
       name,
       description: staged.extractedDescription,
+      sku: payload.sku,
+      barcode: payload.barcode,
       brandId: refs.brandId,
       categoryId: refs.categoryId,
       productTypeId: refs.productTypeId,
@@ -528,6 +540,8 @@ async function enrichExistingProduct(
   if (!product.primaryImageUrl && (staged.primaryImageUrl ?? payload.image)) {
     updates.primaryImageUrl = staged.primaryImageUrl ?? payload.image;
   }
+  if (!product.sku && payload.sku) updates.sku = payload.sku;
+  if (!product.barcode && payload.barcode) updates.barcode = payload.barcode;
   if (product.priceBenchmarkUsd === null && payload.price && payload.price.currency === "USD") {
     updates.priceBenchmarkUsd = payload.price.value.toFixed(2);
   }
@@ -661,5 +675,7 @@ function parsePayload(raw: unknown): StagedPayload {
         : null,
     rating: rating && typeof rating.value === "number" ? { value: rating.value } : null,
     image: typeof payload.image === "string" ? payload.image : null,
+    barcode: typeof payload.barcode === "string" ? payload.barcode : null,
+    sku: typeof payload.sku === "string" ? payload.sku : null,
   };
 }

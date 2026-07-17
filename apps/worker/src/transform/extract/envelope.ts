@@ -95,6 +95,8 @@ export function extractFromEnvelope(envelope: RawEnvelopeDoc, url: string): Html
   // Identity.
   add(candidates, "name", detail.prdtNameEn ?? detail.prdtName);
   add(candidates, "brand", detail.brandName ?? detail.brandNameEn);
+  add(candidates, "sku", envelope.product_id); // source's native product number
+  add(candidates, "barcode", typeof detail.gdsCd === "string" ? detail.gdsCd : null); // GTIN
 
   // Category path → category + product type (the source's own taxonomy).
   const { category, productType } = splitCategoryPath(
@@ -103,11 +105,20 @@ export function extractFromEnvelope(envelope: RawEnvelopeDoc, url: string): Html
   add(candidates, "category", category);
   add(candidates, "product_type", productType);
 
-  // Price: the sale price is what a shopper pays today; the global site quotes USD.
-  const amount = detail.saleAmt ?? detail.minOptnSaleAmt ?? detail.nrmlAmt;
-  if (typeof amount === "number" && amount > 0) {
+  // Prices: regular (nrmlAmt) is the list price; sale (saleAmt) is the current
+  // promo. Both flow to the fact layer (regular_price / promo_price). The
+  // global site quotes USD.
+  const regularRaw = detail.nrmlAmt ?? detail.minOptnNrmlAmt;
+  const saleRaw = detail.saleAmt ?? detail.minOptnSaleAmt;
+  const regular = typeof regularRaw === "number" && regularRaw > 0 ? regularRaw : null;
+  const sale = typeof saleRaw === "number" && saleRaw > 0 ? saleRaw : null;
+  const amount = regular ?? sale;
+  if (amount !== null) {
     add(candidates, "price_text", `USD ${amount}`);
     add(candidates, "currency", "USD");
+  }
+  if (sale !== null && regular !== null && sale < regular) {
+    add(candidates, "promo_price_text", `USD ${sale}`);
   }
 
   // Rating: formatted so parseRatingText yields { rating, reviewCount }.

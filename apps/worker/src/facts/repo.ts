@@ -57,6 +57,7 @@ export function createFactRepo(db: Db): FactRepo {
           observedAt: row.fetchedAt,
           confidenceScore: row.confidenceScore,
           priceValue: payload.price?.value ?? null,
+          promoValue: payload.price?.promoValue ?? null,
           priceCurrency: payload.price?.currency ?? null,
           priceOriginalText: row.extractedPriceText,
           ratingValue: payload.rating?.value ?? null,
@@ -149,6 +150,7 @@ export function createFactRepo(db: Db): FactRepo {
         marketId: input.marketId,
         retailer: input.retailer,
         regularPrice: input.priceValue,
+        promoPrice: input.promoPrice,
         currency: input.currency,
         weekEnding: input.weekEnding,
       });
@@ -190,17 +192,21 @@ export function createFactRepo(db: Db): FactRepo {
 }
 
 function parsePayload(raw: unknown): {
-  price: { value: number; currency: string | null } | null;
+  price: { value: number; promoValue: number | null; currency: string | null } | null;
   rating: { value: number; reviewCount: number | null } | null;
 } {
   const payload = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-  const price = payload.price as { value?: unknown; currency?: unknown } | null | undefined;
+  const price = payload.price as
+    | { value?: unknown; promoValue?: unknown; currency?: unknown }
+    | null
+    | undefined;
   const rating = payload.rating as { value?: unknown; reviewCount?: unknown } | null | undefined;
   return {
     price:
       price && typeof price.value === "number"
         ? {
             value: price.value,
+            promoValue: typeof price.promoValue === "number" ? price.promoValue : null,
             currency: typeof price.currency === "string" ? price.currency : null,
           }
         : null,

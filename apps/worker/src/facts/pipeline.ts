@@ -29,6 +29,8 @@ export interface FactEvidence {
   observedAt: Date;
   confidenceScore: string | null;
   priceValue: number | null;
+  /** Current promo/sale price when the source lists one below the regular price. */
+  promoValue: number | null;
   priceCurrency: string | null;
   priceOriginalText: string | null;
   ratingValue: number | null;
@@ -93,6 +95,7 @@ export interface FactRepo {
     marketId: string;
     retailer: string;
     priceValue: string;
+    promoPrice: string | null;
     currency: string;
     weekEnding: string;
   }): Promise<boolean>;
@@ -192,6 +195,13 @@ export async function runFactCycle(deps: {
                 marketId,
                 retailer: row.sourceSlug,
                 priceValue: check.value.value.toFixed(2),
+                // Promo only when plausible: positive and below the regular price.
+                promoPrice:
+                  row.promoValue !== null &&
+                  row.promoValue > 0 &&
+                  row.promoValue < check.value.value
+                    ? row.promoValue.toFixed(2)
+                    : null,
                 currency: check.value.currency,
                 weekEnding: weekEnding(row.observedAt),
               });

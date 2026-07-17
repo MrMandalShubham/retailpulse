@@ -93,9 +93,12 @@ describe("extractFromEnvelope", () => {
   it("maps every report-critical field with the api_json method", () => {
     expect(value("name")).toContain("celimax Retinal Shot");
     expect(value("brand")).toBe("celimax");
+    expect(value("sku")).toBe("GA260339051");
+    expect(value("barcode")).toBe("8809700321918");
     expect(value("category")).toBe("Skincare");
     expect(value("product_type")).toBe("Essence & Serum");
-    expect(value("price_text")).toBe("USD 18.48"); // sale price = what a shopper pays
+    expect(value("price_text")).toBe("USD 24"); // regular/list price
+    expect(value("promo_price_text")).toBe("USD 18.48"); // current sale price
     expect(value("currency")).toBe("USD");
     expect(value("rating_text")).toBe("4.7/5 (1356 reviews)");
     expect(value("image")).toBe(
@@ -132,15 +135,34 @@ describe("processDocument over an envelope", () => {
     expect(staged.aiRecommended).toBe(false);
   });
 
-  it("fills the normalized payload the facts pipeline reads (price + rating)", () => {
+  it("fills the normalized payload the facts pipeline reads (price + promo + rating + ids)", () => {
     const payload = result.staged!.normalizedPayload as {
-      price: { value: number; currency: string | null };
+      price: { value: number; promoValue?: number; currency: string | null };
       rating: { value: number; reviewCount: number | null };
       productType: string | null;
+      barcode: string | null;
+      sku: string | null;
     };
-    expect(payload.price).toMatchObject({ value: 18.48, currency: "USD" });
+    expect(payload.price).toMatchObject({ value: 24, promoValue: 18.48, currency: "USD" });
     expect(payload.rating).toMatchObject({ value: 4.7, reviewCount: 1356 });
     expect(payload.productType).toBe("Essence & Serum");
+    expect(payload.barcode).toBe("8809700321918");
+    expect(payload.sku).toBe("GA260339051");
+  });
+
+  it("parses small labeled review counts (no >5 guard for 'N reviews')", () => {
+    const few = {
+      ...ENVELOPE,
+      endpoints: {
+        ...ENVELOPE.endpoints,
+        "review-summary": { totalStarRate: 5, totalReviewCount: 3 },
+      },
+    };
+    const r = processDocument(document, JSON.stringify(few), engine, EMPTY_MASTER);
+    const payload = r.staged!.normalizedPayload as {
+      rating: { value: number; reviewCount: number | null };
+    };
+    expect(payload.rating).toMatchObject({ value: 5, reviewCount: 3 });
   });
 
   it("still runs the HTML path for non-envelope payloads", () => {
