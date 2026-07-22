@@ -50,3 +50,6 @@ export { mediaAssets, productMediaLinks, mediaVariants } from "./media.js";
 
 // Product-discovery layer (Phase 0) — sitemap-first mapping, upstream of ingestion
 export { discoveryRuns, discoveredProductPages } from "./discovery.js";
+
+// Per-platform clean product stores — one fully-transformed table per source
+export { oliveyoungGlobalProducts } from "./platform-oliveyoung.js";
