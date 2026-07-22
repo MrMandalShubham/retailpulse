@@ -19,19 +19,9 @@
     "db:seed": "pnpm --filter @dip/db seed",
     "db:studio": "pnpm --filter @dip/db studio",
     "bucket:ensure": "pnpm --filter @dip/storage ensure-bucket",
-    "ingest:run": "pnpm --filter @dip/worker ingest",
-    "ingest:api": "pnpm --filter @dip/worker ingest-api",
-    "platform:load": "pnpm --filter @dip/worker platform-load",
-    "transform:run": "pnpm --filter @dip/worker transform",
-    "ai-review:run": "pnpm --filter @dip/worker ai-review",
-    "promote:run": "pnpm --filter @dip/worker promote",
-    "facts:run": "pnpm --filter @dip/worker facts",
-    "enrich:run": "pnpm --filter @dip/worker enrich",
-    "render:run": "pnpm --filter @dip/worker render",
-    "report:run": "pnpm --filter @dip/worker report",
     "discover:run": "pnpm --filter @dip/worker discover run",
-    "discover:batch": "pnpm --filter @dip/worker discover batch",
-    "discover:backfill": "pnpm --filter @dip/worker discover backfill"
+    "ingest:api": "pnpm --filter @dip/worker ingest-api",
+    "platform:load": "pnpm --filter @dip/worker platform-load"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",

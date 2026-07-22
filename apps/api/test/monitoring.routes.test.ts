@@ -45,7 +45,7 @@ describe("monitoring routes — validation & static (no database needed)", () =>
       (
         await app.inject({
           method: "GET",
-          url: "/monitoring/tables/products_master/records?limit=500",
+          url: "/monitoring/tables/oliveyoung_global_products/records?limit=500",
         })
       ).statusCode,
     ).toBe(400);
@@ -60,9 +60,11 @@ describe("monitoring routes — validation & static (no database needed)", () =>
     expect(cfg.statusCode).toBe(200);
     const body = cfg.json();
     expect(Array.isArray(body.tables)).toBe(true);
-    expect(body.tables.some((t: { table: string }) => t.table === "products_master")).toBe(true);
-    // Phases: 0 (discovery) + 1..6.
-    expect(body.phases).toHaveLength(7);
+    expect(
+      body.tables.some((t: { table: string }) => t.table === "oliveyoung_global_products"),
+    ).toBe(true);
+    // Clean DIP phases: discovery, raw ingestion, clean store.
+    expect(body.phases).toHaveLength(3);
     expect(body.phases.some((p: { key: string }) => p.key === "discovery")).toBe(true);
 
     const page = await app.inject({ method: "GET", url: "/monitoring" });

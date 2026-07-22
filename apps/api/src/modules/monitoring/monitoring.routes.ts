@@ -1,10 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { CORE_TABLES, PHASES } from "./config.js";
 import {
-  aiQuality,
   alerts,
   allTableHealth,
-  dataQuality,
   discoveryStats,
   overview,
   phaseStatuses,
@@ -24,8 +22,6 @@ export async function monitoringRoutes(app: FastifyInstance): Promise<void> {
   app.get("/monitoring/discovery", async () => discoveryStats(db()));
   app.get("/monitoring/phases", async () => ({ phases: await phaseStatuses(db()) }));
   app.get("/monitoring/tables", async () => ({ tables: await allTableHealth(db()) }));
-  app.get("/monitoring/data-quality", async () => dataQuality(db()));
-  app.get("/monitoring/ai-quality", async () => aiQuality(db()));
   app.get("/monitoring/alerts", async () => ({ alerts: await alerts(db()) }));
 
   app.get<{ Querystring: { limit?: string } }>("/monitoring/runs", async (request, reply) => {

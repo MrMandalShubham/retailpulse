@@ -1,11 +1,9 @@
 /**
  * Phase 0 — product discovery CLI (sitemap + category-crawl, deterministic).
- *   pnpm discover:run                       discover + map product URLs
- *   pnpm discover:batch <sourceSlug> [n]    queue up to n pending pages into seed_urls
- *   pnpm discover:backfill                   link discovered pages to canonical products
+ *   pnpm discover:run    discover + map product pages into discovered_product_pages
  *
- * Thin by design: discovers and maps only. Handoff is the existing
- * sources.seed_urls; the render/ingest pipeline is unchanged.
+ * Thin by design: discovers and maps only. The clean flow's `ingest:api` reads
+ * pending map rows directly (no seed_urls hand-off).
  */
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
@@ -14,43 +12,24 @@ import { loadConfig } from "@dip/config";
 import { createDb } from "@dip/db";
 import { postJsonDefault } from "./discovery/category.js";
 import { runDiscoveryCycle } from "./discovery/pipeline.js";
-import { backfillCanonical, batchToSeedUrls, createDiscoveryRepo } from "./discovery/repo.js";
+import { createDiscoveryRepo } from "./discovery/repo.js";
 import { fetchTextDefault } from "./discovery/sitemap.js";
 
 loadEnv({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
-const mode = process.argv[2] ?? "run";
 const config = loadConfig();
 const logger = pino({ level: config.LOG_LEVEL, name: "dip-engine-discover" });
 const { db, pool } = createDb(config.DATABASE_URL);
 
 try {
-  if (mode === "run") {
-    const repo = createDiscoveryRepo(db);
-    const summaries = await runDiscoveryCycle({
-      repo,
-      fetchText: (url) => fetchTextDefault(url, config.INGEST_FETCH_TIMEOUT_MS),
-      postJson: (url, body) => postJsonDefault(url, body, config.INGEST_FETCH_TIMEOUT_MS),
-      logger,
-    });
-    logger.info({ summaries }, "discovery cycle complete");
-  } else if (mode === "backfill") {
-    const backfilled = await backfillCanonical(db);
-    logger.info({ backfilled }, "canonical backfill complete");
-  } else if (mode === "batch") {
-    const slug = process.argv[3];
-    const limit = Number.parseInt(process.argv[4] ?? "50", 10);
-    if (!slug) throw new Error("usage: discover batch <sourceSlug> [limit]");
-    // Link already-promoted pages first so they aren't re-queued.
-    const backfilled = await backfillCanonical(db);
-    const res = await batchToSeedUrls(db, slug, Number.isFinite(limit) ? limit : 50);
-    logger.info(
-      { slug, backfilled, queued: res.queued, sourceFound: res.sourceId !== null },
-      "discovery batch complete",
-    );
-  } else {
-    throw new Error(`unknown mode '${mode}' (expected run | batch | backfill)`);
-  }
+  const repo = createDiscoveryRepo(db);
+  const summaries = await runDiscoveryCycle({
+    repo,
+    fetchText: (url) => fetchTextDefault(url, config.INGEST_FETCH_TIMEOUT_MS),
+    postJson: (url, body) => postJsonDefault(url, body, config.INGEST_FETCH_TIMEOUT_MS),
+    logger,
+  });
+  logger.info({ summaries }, "discovery cycle complete");
   await pool.end();
   process.exit(0);
 } catch (err) {

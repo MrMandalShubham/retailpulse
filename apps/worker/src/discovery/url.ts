@@ -1,11 +1,10 @@
 const TRACKING_PARAMS = /^(utm_|fbclid$|gclid$|msclkid$|mc_cid$|mc_eid$|ref$)/i;
 
 /**
- * Canonical URL normalization for product_sources uniqueness/idempotency
- * (approved rule): lowercase scheme+host, drop default ports and fragments,
- * strip tracking params, sort remaining query params, trim trailing slash
- * (except root). The SAME page must always normalize to the SAME string —
- * this is what makes re-promotion structurally unable to duplicate products.
+ * Canonical URL normalization: lowercase scheme+host, drop default ports and
+ * fragments, strip tracking params, sort remaining query params, trim trailing
+ * slash (except root). The SAME page always normalizes to the SAME string —
+ * used as the discovery map's dedup key (discovered_product_pages.normalized_url).
  */
 export function normalizeSourceUrl(rawUrl: string): string {
   try {

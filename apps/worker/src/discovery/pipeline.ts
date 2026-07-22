@@ -1,5 +1,5 @@
 import type { DiscoveryConfig } from "@dip/domain";
-import { normalizeSourceUrl } from "@dip/promotion";
+import { normalizeSourceUrl } from "./url.js";
 import { discoverViaCategoryApi } from "./category.js";
 import { type DiscoveredUrl, discoverViaSitemap } from "./sitemap.js";
 

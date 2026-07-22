@@ -12,19 +12,13 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { inList } from "./helpers.js";
-import { markets } from "./markets.js";
 
 /**
- * Raw ELT layer (Phase 2): sources -> crawl_jobs -> raw_documents.
- * Lives in the same public schema (approved decision) but is a strictly
- * separate data flow: nothing in the normalized 8-table core references these
- * tables, and nothing here writes to the core. The single FK into master data
- * (sources.market_id) is a lookup, not a data flow.
+ * Raw ELT layer: sources -> crawl_jobs -> raw_documents.
  *
- * ON DELETE design: deletion cascades downward within the raw layer
- * (sources -> crawl_jobs -> raw_documents) — removing a source config
- * intentionally discards its ingestion history and can never touch clean
- * data. markets is master data, so sources.market_id is SET NULL instead.
+ * ON DELETE design: deletion cascades downward (sources -> crawl_jobs ->
+ * raw_documents) — removing a source config intentionally discards its
+ * ingestion history.
  */
 
 /** External websites / APIs we ingest from. */
@@ -36,7 +30,6 @@ export const sources = pgTable(
     slug: text("slug").notNull().unique(),
     baseUrl: text("base_url").notNull(),
     sourceType: text("source_type").notNull().default("website"),
-    marketId: uuid("market_id").references(() => markets.id, { onDelete: "set null" }),
     enabled: boolean("enabled").notNull().default(true),
     // URLs fetched per crawl in Phase 2. The max-5-per-job cap is an
     // application rule (MAX_SEED_URLS_PER_JOB), deliberately not a constraint.
@@ -55,10 +48,7 @@ export const sources = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => [
-    check("sources_source_type_check", inList("source_type", SOURCE_TYPES)),
-    index("sources_market_id_idx").on(table.marketId),
-  ],
+  () => [check("sources_source_type_check", inList("source_type", SOURCE_TYPES))],
 );
 
 /** One ingestion run for a source. */

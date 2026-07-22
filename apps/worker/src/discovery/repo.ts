@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, schema, sql, type Db } from "@dip/db";
+import { and, eq, isNotNull, schema, sql, type Db } from "@dip/db";
 import type { DiscoveryRepo, PageRecord } from "./pipeline.js";
 
 /** Drizzle-backed discovery repo (Phase 0a). */
@@ -83,63 +83,4 @@ export function createDiscoveryRepo(db: Db): DiscoveryRepo {
         .where(eq(schema.discoveryRuns.id, runId));
     },
   };
-}
-
-/**
- * Backfill: mark discovered pages 'promoted' once promotion has created a
- * product_source with the same normalized URL (the canonical link). Idempotent.
- */
-export async function backfillCanonical(db: Db): Promise<number> {
-  const res = await db.execute(sql`
-    update discovered_product_pages dpp
-    set batch_status = 'promoted'
-    from product_sources ps
-    where dpp.normalized_url = ps.source_url
-      and dpp.batch_status <> 'promoted'
-  `);
-  return res.rowCount ?? 0;
-}
-
-/**
- * Batch handoff: take up to `limit` pending pages for a source that are NOT
- * already in product_sources, write them into sources.seed_urls, and mark them
- * queued. The existing render/ingest flow reads seed_urls unchanged.
- */
-export async function batchToSeedUrls(
-  db: Db,
-  sourceSlug: string,
-  limit: number,
-): Promise<{ queued: number; urls: string[]; sourceId: string | null }> {
-  const [source] = await db
-    .select({ id: schema.sources.id })
-    .from(schema.sources)
-    .where(eq(schema.sources.slug, sourceSlug))
-    .limit(1);
-  if (!source) return { queued: 0, urls: [], sourceId: null };
-
-  const dpp = schema.discoveredProductPages;
-  const pending = await db
-    .select({ id: dpp.id, normalizedUrl: dpp.normalizedUrl })
-    .from(dpp)
-    .where(
-      and(
-        eq(dpp.sourceId, source.id),
-        eq(dpp.batchStatus, "pending"),
-        sql`not exists (select 1 from product_sources ps where ps.source_url = ${dpp.normalizedUrl})`,
-      ),
-    )
-    .orderBy(dpp.createdAt)
-    .limit(limit);
-
-  if (pending.length === 0) return { queued: 0, urls: [], sourceId: source.id };
-
-  const urls = pending.map((p) => p.normalizedUrl);
-  await db.transaction(async (tx) => {
-    await tx.update(schema.sources).set({ seedUrls: urls }).where(eq(schema.sources.id, source.id));
-    await tx
-      .update(dpp)
-      .set({ batchStatus: "queued" })
-      .where(inArray(dpp.id, pending.map((p) => p.id)));
-  });
-  return { queued: urls.length, urls, sourceId: source.id };
 }

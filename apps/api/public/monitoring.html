@@ -324,7 +324,7 @@
       <section class="tab active" id="tab-overview">
         <h2>Summary</h2>
         <div class="cards" id="cards"></div>
-        <h2>Workflow phases (P0 → P6)</h2>
+        <h2>Workflow phases (P0 → P2)</h2>
         <div class="phase" id="phases"></div>
         <h2>Attention</h2>
         <div id="ovAlerts"></div>
@@ -551,9 +551,7 @@
       const TABS = [
         ["overview", "Overview"],
         ["discovery", "Phase 0: Discovery"],
-        ["tables", "Core Tables"],
-        ["quality", "Data Quality"],
-        ["ai", "AI Quality"],
+        ["tables", "Tables"],
         ["runs", "Run History"],
         ["alerts", "Alerts"],
       ];
@@ -609,8 +607,6 @@
           if (k === "overview") await loadOverview();
           else if (k === "discovery") await loadDiscovery();
           else if (k === "tables") await loadTables();
-          else if (k === "quality") await loadQuality();
-          else if (k === "ai") await loadAI();
           else if (k === "runs") await loadRuns();
           else if (k === "alerts") await loadAlerts();
           $("updated").textContent = "updated " + new Date().toLocaleTimeString();
@@ -627,16 +623,12 @@
         $("env").textContent = "DB connected";
         const c = o.cards;
         $("cards").innerHTML = [
-          ["Products", c.products],
-          ["Brands", c.brands],
-          ["Categories", c.categories],
-          ["Product types", c.types],
-          ["Markets", c.markets],
-          ["Price facts", c.priceFacts],
-          ["Rating facts", c.ratingFacts],
-          ["Open observations", c.openObservations],
-          ["Open AI suggestions", c.openSuggestions],
-          ["Staged: needs review", c.stagedNeedsReview],
+          ["Sources", c.sources],
+          ["Products discovered", c.discovered],
+          ["Pending ingest", c.pending],
+          ["Ingested", c.ingested],
+          ["Raw documents", c.rawDocs],
+          ["Clean products", c.cleanProducts],
           ["Critical alerts", o.alertCounts.critical],
           ["Warnings", o.alertCounts.warning],
         ]
@@ -650,7 +642,7 @@
     <div class="s" style="margin:6px 0">${dot(p.lastRunStatus || "")}last run: ${esc(p.lastRunStatus || "n/a")}</div>
     <div class="s">output rows: <b style="color:var(--text)">${p.outputRows}</b></div>
     <div class="s">runs: ${p.runs} · <span style="color:var(--ok)">${p.succeededRuns} ok</span> · <span style="color:var(--bad)">${p.failedRuns} fail</span></div>
-    <div class="s">processed: ${p.processed} · failed: ${p.failed}${p.avgSeconds != null ? ` · ~${p.avgSeconds}s/run` : ""}</div>
+    <div class="s">processed: ${p.processed}${p.avgSeconds != null ? ` · ~${p.avgSeconds}s/run` : ""}</div>
   </div>`,
           )
           .join("");
@@ -673,8 +665,7 @@
         $("discCards").innerHTML = [
           ["Websites in discovery", t.sourcesInDiscovery],
           ["Products mapped", t.totalMapped],
-          ["Queued for ingest", t.queued],
-          ["Reached canonical", t.promoted],
+          ["Ingested", t.ingested],
           ["Pending", t.pending],
         ]
           .map(([l, v]) => `<div class="card"><b>${v}</b><span>${l}</span></div>`)
