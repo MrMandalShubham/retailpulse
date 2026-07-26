@@ -47,6 +47,7 @@ export interface CleanProduct {
   sellingPoint: string | null;
   whyWeLoveIt: string | null;
   ingredients: string | null;
+  keyIngredients: string[];
   howToUse: string | null;
   primaryImage: string | null;
   reviewCount: number | null;
@@ -60,15 +61,41 @@ export interface CleanProduct {
   attributeScores: unknown;
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  reg: "®", trade: "™", copy: "©", deg: "°", hellip: "…", bull: "•", middot: "·",
+  mdash: "—", ndash: "–", lsquo: "'", rsquo: "'", ldquo: '"', rdquo: '"',
+  times: "×", divide: "÷", frac12: "½", frac14: "¼", frac34: "¾", plusmn: "±",
+  eacute: "é", egrave: "è", agrave: "à", acirc: "â", uuml: "ü", ouml: "ö",
+  auml: "ä", ntilde: "ñ", ccedil: "ç", szlig: "ß", iexcl: "¡", euro: "€", pound: "£",
+  alpha: "α", beta: "β", gamma: "γ", delta: "δ", omega: "ω", micro: "µ", mu: "μ",
+  pi: "π", rarr: "→", larr: "←", harr: "↔",
+};
+
+/**
+ * Decode HTML entities: numeric (&#NNN; / &#xHH;) + a broad named set. Loops
+ * until the string stops changing (capped), so multiply-encoded content
+ * ("&amp;amp;rsquo;" -> "&amp;rsquo;" -> "&rsquo;" -> "'") fully unwraps.
+ */
 function decodeEntities(s: string): string {
-  return s
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&rsquo;|&lsquo;/gi, "'")
-    .replace(/&reg;/gi, "®")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&"); // last, so decoded entities aren't re-decoded
+  let out = s;
+  for (let i = 0; i < 5; i++) {
+    const next = out
+      .replace(/&#(\d+);/g, (_, n) => codePoint(Number(n)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, h) => codePoint(Number.parseInt(h, 16)))
+      .replace(/&([a-z][a-z0-9]*);/gi, (m, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
+function codePoint(n: number): string {
+  try {
+    return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+  } catch {
+    return "";
+  }
 }
 
 /** Short single-line field: decode, collapse all whitespace, trim. */
@@ -228,6 +255,77 @@ export function parseNameParts(nameEnRaw: string | null): NameParts {
 }
 
 /**
+ * Curated dictionary of common K-beauty actives → canonical name + match regex.
+ * Used to pull the HERO ingredients a product markets out of the free-form
+ * ftrdIngrdText prose. This is NOT a full INCI list (the source has none) — it's
+ * "featured ingredients," dictionary-bounded and heuristic; the raw `ingredients`
+ * prose stays as the fallback.
+ */
+const INGREDIENT_DICT: ReadonlyArray<readonly [string, RegExp]> = [
+  ["Centella Asiatica", /\b(centella|cica|madecassoside|madecassic|asiaticoside|tiger grass)\b/i],
+  ["Niacinamide", /\bniacinamide\b/i],
+  ["Hyaluronic Acid", /\b(hyaluronic|hyaluronate)\b/i],
+  ["Retinal", /\b(retinal|retinaldehyde)\b/i],
+  ["Retinol", /\bretinol\b/i],
+  ["Vitamin C", /\b(vitamin c|ascorb(ic|yl|ate))\b/i],
+  ["Glutathione", /\bglutathione\b/i],
+  ["Panthenol", /\bpanthenol\b/i],
+  ["Ceramide", /\bceramides?\b/i],
+  ["Peptide", /\b(peptides?|matrixyl|copper tripeptide)\b/i],
+  ["Collagen", /\bcollagen\b/i],
+  ["Salicylic Acid", /\b(salicylic|\bbha\b)\b/i],
+  ["Glycolic Acid", /\bglycolic\b/i],
+  ["Lactic Acid", /\blactic acid\b/i],
+  ["Mandelic Acid", /\bmandelic\b/i],
+  ["PHA", /\b(gluconolactone|\bpha\b)\b/i],
+  ["PDRN", /\b(pdrn|polydeoxyribonucleotide|salmon dna)\b/i],
+  ["Snail Mucin", /\bsnail\b/i],
+  ["Propolis", /\bpropolis\b/i],
+  ["Heartleaf", /\b(heartleaf|houttuynia)\b/i],
+  ["Tranexamic Acid", /\btranexamic\b/i],
+  ["Arbutin", /\barbutin\b/i],
+  ["Azelaic Acid", /\bazelaic\b/i],
+  ["Kojic Acid", /\bkojic\b/i],
+  ["Bakuchiol", /\bbakuchiol\b/i],
+  ["Squalane", /\bsqualane\b/i],
+  ["Tea Tree", /\b(tea tree|melaleuca)\b/i],
+  ["Green Tea", /\b(green tea|camellia sinensis|egcg)\b/i],
+  ["Mugwort", /\b(mugwort|artemisia)\b/i],
+  ["Rice", /\b(rice extract|rice water|oryza)\b/i],
+  ["Bisabolol", /\bbisabolol\b/i],
+  ["Allantoin", /\ballantoin\b/i],
+  ["Adenosine", /\badenosine\b/i],
+  ["Beta-Glucan", /\bbeta[- ]?glucan\b/i],
+  ["Galactomyces", /\bgalactomyces\b/i],
+  ["Probiotics", /\b(probiotics?|lactobacillus|bifida|\bbiome?\b)\b/i],
+  ["Vitamin E", /\b(vitamin e|tocopher(ol|yl))\b/i],
+  ["Vitamin B12", /\bvitamin b12\b/i],
+  ["Vitamin A", /\b(vitamin a|retinyl)\b/i],
+  ["Aloe Vera", /\baloe\b/i],
+  ["Honey", /\bhoney\b/i],
+  ["Licorice", /\b(licorice|liquorice|glycyrrhiza)\b/i],
+  ["Caffeine", /\bcaffeine\b/i],
+  ["Ectoin", /\bectoin\b/i],
+  ["Growth Factor", /\b(\begf\b|growth factor)\b/i],
+  ["Zinc", /\bzinc\b/i],
+  ["Hydrocolloid", /\bhydrocolloid\b/i],
+  ["Jojoba", /\bjojoba\b/i],
+  ["Argan Oil", /\bargan\b/i],
+  ["Shea Butter", /\bshea\b/i],
+  ["Fig", /\bfig extract\b/i],
+];
+
+/** Extract hero ingredients from the (already-cleaned) ingredient prose. */
+export function extractKeyIngredients(text: string | null): string[] {
+  if (!text) return [];
+  const found: string[] = [];
+  for (const [name, re] of INGREDIENT_DICT) {
+    if (re.test(text) && !found.includes(name)) found.push(name);
+  }
+  return found.slice(0, 15);
+}
+
+/**
  * Map one raw envelope to a clean product row. Returns null when the essential
  * detail-data is missing (delisted/failed fetches) — those never enter the
  * clean store.
@@ -245,6 +343,7 @@ export function mapEnvelopeToCleanProduct(env: any, rawDocumentId: string | null
   const [l1, l2, l3] = splitPath(pathEn);
   const nameEn = clean(d.prdtNameEn);
   const parts = parseNameParts(nameEn);
+  const ingredients = cleanProse(info.ftrdIngrdText);
 
   return {
     productId,
@@ -283,7 +382,8 @@ export function mapEnvelopeToCleanProduct(env: any, rawDocumentId: string | null
     descriptionHtml: decodeHtml(info.dtlDesc),
     sellingPoint: cleanProse(info.sellingPointText),
     whyWeLoveIt: cleanProse(info.whyWeLoveItText),
-    ingredients: cleanProse(info.ftrdIngrdText),
+    ingredients,
+    keyIngredients: extractKeyIngredients(ingredients),
     howToUse: cleanProse(info.howToUseText),
     primaryImage: imageUrl(d.imagePath),
     reviewCount: intVal(r.totalReviewCount),

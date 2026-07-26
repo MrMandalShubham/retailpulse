@@ -1,5 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { mapEnvelopeToCleanProduct, parseNameParts } from "../src/platform/oliveyoung-clean.js";
+import {
+  extractKeyIngredients,
+  mapEnvelopeToCleanProduct,
+  parseNameParts,
+} from "../src/platform/oliveyoung-clean.js";
+
+describe("extractKeyIngredients", () => {
+  it("pulls hero actives from marketing prose (dictionary-bounded)", () => {
+    const prose =
+      "Contains 50,000ppm of Niacinamide that brightens the skin. Glutathione, a powerful " +
+      "antioxidant. Contains Tranexamic acid and Alpha-arbutin and bisabolol. With 5% panthenol.";
+    const r = extractKeyIngredients(prose);
+    expect(r).toContain("Niacinamide");
+    expect(r).toContain("Glutathione");
+    expect(r).toContain("Tranexamic Acid");
+    expect(r).toContain("Arbutin");
+    expect(r).toContain("Bisabolol");
+    expect(r).toContain("Panthenol");
+  });
+
+  it("distinguishes retinal from retinol", () => {
+    expect(extractKeyIngredients("nano liposome retinal")).toContain("Retinal");
+    expect(extractKeyIngredients("nano liposome retinal")).not.toContain("Retinol");
+  });
+
+  it("returns an empty array for no matches or null", () => {
+    expect(extractKeyIngredients("just some water and fragrance")).toEqual([]);
+    expect(extractKeyIngredients(null)).toEqual([]);
+  });
+});
 
 describe("parseNameParts", () => {
   it("keeps brand, splits size, set-type, and composition", () => {
@@ -130,7 +159,7 @@ const ENVELOPE = {
       details: {
         dtlDesc: "&lt;div&gt;&lt;img src=&quot;x.jpg&quot;/&gt;&lt;/div&gt;",
         whyWeLoveItText: "Retinal firming.\r\n\r\nDeeper   penetration.",
-        ftrdIngrdText: "Contains Micro A Shot&reg; retinal.",
+        ftrdIngrdText: "Contains Micro A Shot&reg; retinal and Niacinamide&trade;.",
         howToUseText: "Apply in the evening.",
       },
     },
@@ -181,7 +210,8 @@ describe("mapEnvelopeToCleanProduct", () => {
   });
 
   it("decodes prose + html and preserves paragraph breaks", () => {
-    expect(row.ingredients).toBe("Contains Micro A Shot® retinal.");
+    expect(row.ingredients).toBe("Contains Micro A Shot® retinal and Niacinamide™."); // &reg; + &trade; decoded
+    expect(row.keyIngredients).toEqual(expect.arrayContaining(["Retinal", "Niacinamide"]));
     expect(row.whyWeLoveIt).toBe("Retinal firming.\n\nDeeper penetration."); // \r\n normalized, spaces collapsed
     expect(row.descriptionHtml).toBe('<div><img src="x.jpg"/></div>'); // real HTML, decoded
   });

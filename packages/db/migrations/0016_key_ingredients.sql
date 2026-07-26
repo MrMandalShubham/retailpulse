@@ -1,0 +1,1 @@
+ALTER TABLE "oliveyoung_global_products" ADD COLUMN "key_ingredients" text[];

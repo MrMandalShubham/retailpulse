@@ -84,7 +84,8 @@ export const oliveyoungGlobalProducts = pgTable(
     descriptionHtml: text("description_html"),
     sellingPoint: text("selling_point"),
     whyWeLoveIt: text("why_we_love_it"),
-    ingredients: text("ingredients"),
+    ingredients: text("ingredients"), // raw marketing prose (fallback)
+    keyIngredients: text("key_ingredients").array(), // hero actives parsed from the prose
     howToUse: text("how_to_use"),
 
     // --- media & reviews (scalars) ---
