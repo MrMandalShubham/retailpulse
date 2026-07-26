@@ -15,5 +15,8 @@ export { sources, crawlJobs, rawDocuments } from "./ingestion.js";
 // Product-discovery layer (Phase 0)
 export { discoveryRuns, discoveredProductPages } from "./discovery.js";
 
-// Per-platform clean product store — the end product
-export { oliveyoungGlobalProducts } from "./platform-oliveyoung.js";
+// Per-platform clean product store — the end product + time-series snapshots
+export {
+  oliveyoungGlobalProducts,
+  oliveyoungGlobalProductSnapshots,
+} from "./platform-oliveyoung.js";

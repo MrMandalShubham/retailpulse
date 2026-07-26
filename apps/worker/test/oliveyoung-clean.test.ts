@@ -1,5 +1,83 @@
 import { describe, expect, it } from "vitest";
-import { mapEnvelopeToCleanProduct } from "../src/platform/oliveyoung-clean.js";
+import { mapEnvelopeToCleanProduct, parseNameParts } from "../src/platform/oliveyoung-clean.js";
+
+describe("parseNameParts", () => {
+  it("keeps brand, splits size, set-type, and composition", () => {
+    expect(parseNameParts("celimax Retinal Shot Tightening Booster 15ml Set (+3ml)")).toEqual({
+      productName: "celimax Retinal Shot Tightening Booster",
+      sizeValue: "15.00",
+      sizeUnit: "ml",
+      setType: "Set",
+      composition: "+3ml",
+    });
+  });
+
+  it("handles a plain product (no size/set/gift)", () => {
+    expect(parseNameParts("SKIN1004 Madagascar Centella Ampoule 100ml")).toEqual({
+      productName: "SKIN1004 Madagascar Centella Ampoule",
+      sizeValue: "100.00",
+      sizeUnit: "ml",
+      setType: null,
+      composition: null,
+    });
+  });
+
+  it("drops the [edition] prefix and reads a multi-word set type", () => {
+    expect(
+      parseNameParts("[NUNMEONGI EDITION] ROUND LAB 1025 Dokdo Toner 300ml Double Pack (+Soft Keyring)"),
+    ).toEqual({
+      productName: "ROUND LAB 1025 Dokdo Toner",
+      sizeValue: "300.00",
+      sizeUnit: "ml",
+      setType: "Double Pack",
+      composition: "+Soft Keyring",
+    });
+  });
+
+  it("keeps a bare name intact when there's nothing to strip", () => {
+    expect(parseNameParts("CAREPLUS Scar Cover Spot Patch")).toEqual({
+      productName: "CAREPLUS Scar Cover Spot Patch",
+      sizeValue: null,
+      sizeUnit: null,
+      setType: null,
+      composition: null,
+    });
+  });
+
+  it("captures a multi-item composition and 'Special Set'", () => {
+    const r = parseNameParts(
+      "AESTURA Atobarrier365 Cream 80mL Special Set (+Hydro Essence 25ml+Cera-Hyal Ampoule 7ml)",
+    );
+    expect(r.productName).toBe("AESTURA Atobarrier365 Cream");
+    expect(r.sizeValue).toBe("80.00");
+    expect(r.setType).toBe("Special Set");
+    expect(r.composition).toBe("+Hydro Essence 25ml+Cera-Hyal Ampoule 7ml");
+  });
+
+  it("preserves a '+' that is part of the name (No.5+), strips a duo second size", () => {
+    const r = parseNameParts("numbuzin No.5+ Vitamin Concentrated Serum 30mL+30mL Duo Set");
+    expect(r.productName).toBe("numbuzin No.5+ Vitamin Concentrated Serum");
+    expect(r.sizeValue).toBe("30.00");
+    expect(r.setType).toBe("Duo Set");
+  });
+
+  it("captures a gift paren that starts with a size, not a '+'", () => {
+    const r = parseNameParts("Dr.G Black Snail Cream Duo Set (50ml+50ml+15ml Gift)");
+    expect(r.productName).toBe("Dr.G Black Snail Cream");
+    expect(r.setType).toBe("Duo Set");
+    expect(r.composition).toBe("50ml+50ml+15ml Gift");
+  });
+
+  it("returns all-null for empty input", () => {
+    expect(parseNameParts(null)).toEqual({
+      productName: null,
+      sizeValue: null,
+      sizeUnit: null,
+      setType: null,
+      composition: null,
+    });
+  });
+});
 
 const ENVELOPE = {
   product_id: "GA260339051",

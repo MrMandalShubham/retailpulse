@@ -1,4 +1,4 @@
-import { and, eq, ilike, isNotNull, schema, type Db } from "@dip/db";
+import { and, asc, eq, ilike, isNotNull, schema, type Db } from "@dip/db";
 import type { RawStorageAdapter } from "@dip/domain";
 import { mapEnvelopeToCleanProduct, type CleanProduct } from "./oliveyoung-clean.js";
 
@@ -25,12 +25,20 @@ export interface PlatformLoadDeps {
 export interface PlatformLoadSummary {
   considered: number;
   upserted: number;
+  /** Time-series snapshot rows written/refreshed (one per product per fetch date). */
+  snapshots: number;
   skipped: number;
   failed: number;
 }
 
 export async function runOliveYoungCleanLoad(deps: PlatformLoadDeps): Promise<PlatformLoadSummary> {
-  const summary: PlatformLoadSummary = { considered: 0, upserted: 0, skipped: 0, failed: 0 };
+  const summary: PlatformLoadSummary = {
+    considered: 0,
+    upserted: 0,
+    snapshots: 0,
+    skipped: 0,
+    failed: 0,
+  };
 
   const docs = await deps.db
     .select({
@@ -46,6 +54,9 @@ export async function runOliveYoungCleanLoad(deps: PlatformLoadDeps): Promise<Pl
         isNotNull(schema.rawDocuments.storageKey),
       ),
     )
+    // Oldest first, so when a product has multiple envelopes the NEWEST is
+    // processed last and wins the upsert (freshest data, deterministic).
+    .orderBy(asc(schema.rawDocuments.fetchedAt))
     .limit(deps.limit);
 
   summary.considered = docs.length;
@@ -64,6 +75,10 @@ export async function runOliveYoungCleanLoad(deps: PlatformLoadDeps): Promise<Pl
       }
       await upsertCleanProduct(deps.db, row);
       summary.upserted += 1;
+      // Append a time-series snapshot at the envelope's fetch date (history
+      // accumulates as products are re-ingested over time).
+      await upsertSnapshot(deps.db, row);
+      summary.snapshots += 1;
     } catch (err) {
       summary.failed += 1;
       deps.logger.warn(
@@ -87,4 +102,27 @@ async function upsertCleanProduct(db: Db, row: CleanProduct): Promise<void> {
       // Re-loading refreshes the clean row from the latest envelope.
       set: { ...row, updatedAt: new Date() },
     });
+}
+
+/**
+ * Append/refresh the time-series snapshot for this product on its fetch date.
+ * captured_at comes from the envelope's fetch time (the real observation date),
+ * NOT the load time — so re-cleaning old envelopes stamps history correctly.
+ * Idempotent on (product_id, captured_at).
+ */
+async function upsertSnapshot(db: Db, row: CleanProduct): Promise<void> {
+  const s = schema.oliveyoungGlobalProductSnapshots;
+  const capturedAt = (row.fetchedAt ?? new Date()).toISOString().slice(0, 10);
+  const values = {
+    regularPrice: row.regularPrice,
+    salePrice: row.salePrice,
+    discountRate: row.discountRate,
+    avgRating: row.avgRating,
+    reviewCount: row.reviewCount,
+    stockQty: row.stockQty,
+  };
+  await db
+    .insert(s)
+    .values({ productId: row.productId, capturedAt, ...values })
+    .onConflictDoUpdate({ target: [s.productId, s.capturedAt], set: values });
 }

@@ -17,6 +17,11 @@ export interface CleanProduct {
   fetchedAt: Date | null;
   nameEn: string | null;
   nameKr: string | null;
+  productName: string | null;
+  sizeValue: string | null;
+  sizeUnit: string | null;
+  setType: string | null;
+  composition: string | null;
   brandNo: string | null;
   brandName: string | null;
   brandNameKr: string | null;
@@ -142,6 +147,80 @@ function repStock(optionList: unknown): number | null {
   return intVal(rep?.buyStockQty);
 }
 
+export interface NameParts {
+  productName: string | null;
+  sizeValue: string | null; // numeric column value
+  sizeUnit: string | null;
+  setType: string | null;
+  composition: string | null;
+}
+
+const EDITION_RE = /^\s*\[[^\]]*\]\s*/;
+// A gift/bonus parenthetical: starts with '+', or contains the word "gift"
+// anywhere (e.g. "(50ml+50ml+15ml Gift)", "(Free Gift: Toner 100ml)").
+const GIFT_RE = /\(\s*(\+[^)]*|[^)]*\bgift\b[^)]*)\)/i;
+const SIZE_RE = /(\d+(?:\.\d+)?)\s?(ml|g|kg|ea|pcs|sheets?|매|팩|정|캡슐|장)\b/i;
+const SIZE_RE_G = new RegExp(SIZE_RE.source, "gi");
+const SET_RE = /\s+((?:special|double|refill|gift|value|jumbo|duo|mini|travel|limited)\s+)*(set|pack|duo|kit)\s*$/i;
+
+/**
+ * Split a raw Olive Young product name into parts (heuristic; name_en stays the
+ * fallback). Keeps the brand IN product_name; strips the [edition] prefix, the
+ * size token(s), a trailing set descriptor, and the (+gift) parenthetical.
+ *   "celimax Retinal Shot 15ml Set (+3ml)"
+ *     -> productName "celimax Retinal Shot", size 15 ml, setType "Set", composition "+3ml"
+ */
+export function parseNameParts(nameEnRaw: string | null): NameParts {
+  const empty: NameParts = {
+    productName: null,
+    sizeValue: null,
+    sizeUnit: null,
+    setType: null,
+    composition: null,
+  };
+  if (!nameEnRaw) return empty;
+  let work = nameEnRaw.replace(EDITION_RE, "");
+
+  // gift / composition parenthetical
+  let composition: string | null = null;
+  const gift = work.match(GIFT_RE);
+  if (gift?.[1]) {
+    composition = gift[1].trim().replace(/\s+/g, " ");
+    work = work.replace(gift[0], " ");
+  }
+
+  // size: first value+unit for the columns, then remove ALL size tokens from the name
+  let sizeValue: string | null = null;
+  let sizeUnit: string | null = null;
+  const size = work.match(SIZE_RE);
+  if (size?.[1] && size[2]) {
+    sizeValue = Number.parseFloat(size[1]).toFixed(2);
+    sizeUnit = size[2].toLowerCase();
+    work = work.replace(SIZE_RE_G, " ");
+  }
+
+  // trailing set descriptor
+  let setType: string | null = null;
+  const set = work.match(SET_RE);
+  if (set && set.index !== undefined) {
+    setType = set[0]
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    work = work.slice(0, set.index);
+  }
+
+  const productName =
+    work
+      // orphan '+' left by a removed second size (e.g. "30ml+30ml" -> " + ");
+      // only when space-bounded, so real names like "No.5+" survive.
+      .replace(/\s+\+\s+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/[\s:,\-–+]+$/, "") // trailing junk incl. an orphan '+'
+      .trim() || null;
+  return { productName, sizeValue, sizeUnit, setType, composition };
+}
+
 /**
  * Map one raw envelope to a clean product row. Returns null when the essential
  * detail-data is missing (delisted/failed fetches) — those never enter the
@@ -158,6 +237,8 @@ export function mapEnvelopeToCleanProduct(env: any, rawDocumentId: string | null
 
   const pathEn = clean(d.allPathCtgrNameEn);
   const [l1, l2, l3] = splitPath(pathEn);
+  const nameEn = clean(d.prdtNameEn);
+  const parts = parseNameParts(nameEn);
 
   return {
     productId,
@@ -165,8 +246,13 @@ export function mapEnvelopeToCleanProduct(env: any, rawDocumentId: string | null
     sourceUrl: typeof env?.source_url === "string" ? env.source_url : "",
     rawDocumentId,
     fetchedAt: env?.fetched_at ? new Date(env.fetched_at) : null,
-    nameEn: clean(d.prdtNameEn),
+    nameEn,
     nameKr: clean(d.korPrdtName ?? d.prdtName),
+    productName: parts.productName,
+    sizeValue: parts.sizeValue,
+    sizeUnit: parts.sizeUnit,
+    setType: parts.setType,
+    composition: parts.composition,
     brandNo: clean(d.brandNo),
     brandName: clean(d.brandName ?? d.brandNameEn),
     brandNameKr: clean(d.korBrandName),
