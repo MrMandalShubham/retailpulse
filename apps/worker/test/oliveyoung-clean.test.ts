@@ -68,6 +68,18 @@ describe("parseNameParts", () => {
     expect(r.composition).toBe("50ml+50ml+15ml Gift");
   });
 
+  it("drops annotation parens and still finds a set word they were hiding", () => {
+    const r = parseNameParts("Dr. G pH Cleansing Gel Foam Special Set ( ) (NEW)");
+    expect(r.productName).toBe("Dr. G pH Cleansing Gel Foam");
+    expect(r.setType).toBe("Special Set");
+  });
+
+  it("strips a variant annotation paren from the product name", () => {
+    expect(parseNameParts("B.READY Oil Capture All-In-One Lotion (Single/Set)").productName).toBe(
+      "B.READY Oil Capture All-In-One Lotion",
+    );
+  });
+
   it("returns all-null for empty input", () => {
     expect(parseNameParts(null)).toEqual({
       productName: null,

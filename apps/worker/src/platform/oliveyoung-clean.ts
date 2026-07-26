@@ -199,6 +199,12 @@ export function parseNameParts(nameEnRaw: string | null): NameParts {
     work = work.replace(SIZE_RE_G, " ");
   }
 
+  // Drop any remaining parenthetical (variant/option/status annotations like
+  // "(Single/Set)", "(2 Options)", "(NEW)", or a paren emptied by size removal).
+  // Done AFTER size but BEFORE set detection so a trailing "(...)" can't hide a
+  // real set word (e.g. "Special Set ( ) (NEW)"). The gift paren is already out.
+  work = work.replace(/\([^)]*\)/g, " ");
+
   // trailing set descriptor
   let setType: string | null = null;
   const set = work.match(SET_RE);
