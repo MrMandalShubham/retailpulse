@@ -1,0 +1,28 @@
+# systemd unit for the DIP Engine API (health + /monitoring console + ingestion views).
+# Install:
+#   sudo cp deploy/dip-engine-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dip-engine-api
+# Logs:  journalctl -u dip-engine-api -f
+
+[Unit]
+Description=DIP Engine API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/dip-engine
+# The API reads .env itself; EnvironmentFile keeps NODE_ENV explicit too.
+EnvironmentFile=/opt/dip-engine/.env
+ExecStart=/usr/bin/node apps/api/dist/main.js
+Restart=on-failure
+RestartSec=5
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dip-engine
+
+[Install]
+WantedBy=multi-user.target

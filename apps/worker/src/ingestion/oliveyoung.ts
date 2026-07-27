@@ -1,21 +1,16 @@
-import { gzipSync } from "node:zlib";
-import { fetchUrl } from "./fetcher.js";
-
 /**
- * Olive Young raw API fetcher (Phase 1). For one product it captures the raw
- * page HTML plus the site's own JSON endpoints, assembled VERBATIM — no
- * cleaning, no field extraction. Each capture is independent: a failure of one
- * is recorded and never blocks the others (raw layer = capture what you can,
- * record the rest).
+ * Olive Young API fetcher. For one product it calls the site's own JSON
+ * endpoints and assembles a VERBATIM envelope IN MEMORY (no storage) — the
+ * clean step maps it straight into the per-platform table. Each endpoint is
+ * fetched independently: a failure of one is recorded and never blocks others.
  *
  * Only detail-data is essential (name/brand/category/price/images).
  * details-info (ingredients/how-to-use/description) and review-summary
- * (rating/review count) enrich the record; the page HTML is extra raw evidence
- * stored alongside the envelope as its own .html artifact.
+ * (rating/review count) enrich the record.
  *
- * review-summary body was captured from the live app (Playwright request
- * interception): it needs prdtGbnCode (available in detail-data) + filter
- * flags; no cookies/session required.
+ * The review-summary body was captured from the live app (Playwright request
+ * interception): it needs prdtGbnCode (from detail-data) + filter flags; no
+ * cookies/session required.
  */
 
 const OY_API_BASE = "https://global.oliveyoung.com/product";
@@ -32,18 +27,11 @@ export interface PostJsonResult {
   json: unknown | null;
 }
 
-export interface GetHtmlResult {
-  status: number;
-  body: Uint8Array | null;
-}
-
 export interface OyFetchDeps {
   postJson(url: string, body: unknown): Promise<PostJsonResult>;
-  /** Plain GET of the product page — raw HTML evidence stored alongside. */
-  getHtml(url: string): Promise<GetHtmlResult>;
 }
 
-/** The raw envelope: verbatim endpoint responses, nothing cleaned. */
+/** The in-memory envelope: verbatim endpoint responses, nothing cleaned. */
 export interface RawEnvelope {
   product_id: string;
   source: string;
@@ -57,11 +45,6 @@ export interface OyProductResult {
   /** True when the essential endpoint (detail-data) returned JSON. */
   ok: boolean;
   envelope: RawEnvelope;
-  /** UNCOMPRESSED JSON bytes — what Phase 1 stores as-is (.json). */
-  bytes: Uint8Array;
-  /** Raw page HTML (extra evidence), stored as its own .html artifact. */
-  htmlBytes: Uint8Array | null;
-  htmlStatus: number;
   httpStatus: number;
   endpointStatuses: Record<string, number>;
 }
@@ -94,9 +77,6 @@ export async function fetchOliveYoungProduct(
   const endpoints: Record<string, unknown> = {};
   const http: Record<string, number> = {};
 
-  // 0) Raw page HTML — extra evidence, independent of the API captures.
-  const page = await deps.getHtml(productUrl);
-
   // 1) detail-data — essential; also yields prdtGbnCode for the review call.
   const detail = await deps.postJson(`${OY_API_BASE}/detail-data`, baseBody(prdtNo));
   endpoints["detail-data"] = detail.json;
@@ -115,7 +95,6 @@ export async function fetchOliveYoungProduct(
   );
   endpoints["review-summary"] = review.ok ? review.json : null;
   http["review-summary"] = review.status;
-  http["page-html"] = page.status;
 
   const envelope: RawEnvelope = {
     product_id: prdtNo,
@@ -125,16 +104,7 @@ export async function fetchOliveYoungProduct(
     endpoints,
     http_status: http,
   };
-  const bytes = new TextEncoder().encode(JSON.stringify(envelope));
-  return {
-    ok: detail.ok,
-    envelope,
-    bytes,
-    htmlBytes: page.body,
-    htmlStatus: page.status,
-    httpStatus: detail.status,
-    endpointStatuses: http,
-  };
+  return { ok: detail.ok, envelope, httpStatus: detail.status, endpointStatuses: http };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -143,21 +113,6 @@ function extractPrdtGbnCode(detailJson: unknown): string | null {
   return typeof g === "string" && g.length > 0 ? g : null;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
-
-/**
- * Gzip helper — BUILT but intentionally NOT called during ingestion.
- * Phase 1 stores raw JSON uncompressed so downstream phases read it without
- * decompressing; compression runs only as a final end-of-flow archival step.
- */
-export function gzipEnvelope(bytes: Uint8Array): Uint8Array {
-  return gzipSync(bytes);
-}
-
-/** Default real-HTTP GET of the product page (browser-like UA, retries). */
-export async function defaultGetHtml(url: string, timeoutMs: number): Promise<GetHtmlResult> {
-  const res = await fetchUrl(url, { timeoutMs, retries: 2, userAgent: UA });
-  return { status: res.httpStatus ?? 0, body: res.ok ? res.body : null };
-}
 
 /** Default real-HTTP POST (JSON in, JSON out). Non-JSON responses → json=null. */
 export async function defaultPostJson(

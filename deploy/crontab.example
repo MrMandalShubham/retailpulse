@@ -1,0 +1,13 @@
+# DIP Engine — ingest schedule. Install for the app user with:
+#   crontab deploy/crontab.example
+# Inspect with:  crontab -l    Logs:  tail -f /opt/dip-engine/logs/sync.log
+#
+# flock prevents overlapping runs if a batch outlives the interval.
+# PATH must include node/pnpm (corepack shims live in /usr/bin + ~/.local/share).
+
+APP_DIR=/opt/dip-engine
+INGEST_BATCH=500
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Every 12 hours (00:15 and 12:15 UTC): refresh the map + drain a pending batch.
+15 0,12 * * *  flock -n /tmp/dip-ingest.lock bash /opt/dip-engine/deploy/run-ingest.sh >> /opt/dip-engine/logs/cron.log 2>&1

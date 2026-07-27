@@ -1,7 +1,7 @@
 /**
  * Monitoring queries for the clean DIP. Generic table/phase health is generated
  * from config (CORE_TABLES / PHASES — trusted constants, injection-safe). The
- * flow-specific bits cover discovery, raw ingestion, and the clean store.
+ * flow-specific bits cover discovery and the ingest-&-clean step.
  */
 import { CORE_TABLES, PHASES, THRESHOLDS, type TableMonitor } from "./config.js";
 
@@ -89,7 +89,9 @@ export async function tableRecords(
     where = conds.length ? `where ${conds.join(" or ")}` : "";
   }
   const rows = (
-    await pool.query(`select * from ${q(cfg.table)} ${where} ${order} limit ${Math.min(limit, 100)}`)
+    await pool.query(
+      `select * from ${q(cfg.table)} ${where} ${order} limit ${Math.min(limit, 100)}`,
+    )
   ).rows;
   return { table, mode, records: rows };
 }
@@ -143,9 +145,10 @@ export async function phaseStatuses(pool: Queryable): Promise<PhaseStatus[]> {
         )
       ).rows[0];
       lastRunStatus = (last?.s as string | null) ?? null;
-      if (p.key === "raw_ingestion") processed = outputRows; // crawl_jobs has no doc counters
+      // crawl_jobs has no per-run processed counter — use the clean-store count.
+      if (!p.processedColumn) processed = outputRows;
     } else {
-      processed = outputRows; // clean store: no run table
+      processed = outputRows; // no run table: fall back to output count
     }
 
     out.push({
@@ -271,17 +274,17 @@ export async function alerts(pool: Queryable) {
 
 export async function overview(pool: Queryable) {
   const one = async (sqlText: string) => n((await pool.query(sqlText)).rows[0]?.c);
-  const [sources, discovered, pending, ingested, rawDocs, cleanProducts] = await Promise.all([
+  const [sources, discovered, pending, ingested, cleanProducts, snapshots] = await Promise.all([
     one("select count(*)::bigint c from sources"),
     one("select count(*)::bigint c from discovered_product_pages"),
     one("select count(*)::bigint c from discovered_product_pages where batch_status='pending'"),
     one("select count(*)::bigint c from discovered_product_pages where batch_status='ingested'"),
-    one("select count(*)::bigint c from raw_documents where status='ok'"),
     one("select count(*)::bigint c from oliveyoung_global_products"),
+    one("select count(*)::bigint c from oliveyoung_global_product_snapshots"),
   ]);
   const alertList = await alerts(pool);
   return {
-    cards: { sources, discovered, pending, ingested, rawDocs, cleanProducts },
+    cards: { sources, discovered, pending, ingested, cleanProducts, snapshots },
     alertCounts: {
       critical: alertList.filter((a) => a.level === "critical").length,
       warning: alertList.filter((a) => a.level === "warning").length,

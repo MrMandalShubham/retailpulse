@@ -13,16 +13,17 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { rawDocuments } from "./ingestion.js";
 
 /**
  * Olive Young Global — clean per-platform product store.
  *
  * This is the platform's FINAL clean store: one fully-transformed, typed row
- * per product. Populated from the Phase 1 raw envelopes by a dedicated clean
- * step (HTML entities decoded, prices as numbers, Y/N -> boolean, YYYYMMDD ->
- * date, category path split, text trimmed). The verbatim raw stays in the
- * bucket + raw_documents; nothing raw or half-parsed lands here.
+ * per product. Written directly by Phase 1 ingestion, which fetches each
+ * product's API envelope in memory and cleans it in the same pass (HTML
+ * entities decoded, prices as numbers, Y/N -> boolean, YYYYMMDD -> date,
+ * category path split, text trimmed). Nothing raw or half-parsed lands here,
+ * and no raw copy is persisted — the map (discovered_product_pages) can always
+ * re-drive a fresh fetch.
  *
  * Per-platform by design: every source's API exposes different fields, so each
  * platform gets its own clean table (sephora_us_products, etc.). Structured
@@ -37,10 +38,6 @@ export const oliveyoungGlobalProducts = pgTable(
     productId: text("product_id").notNull(), // prdtNo
     barcode: text("barcode"), // gdsCd (GTIN)
     sourceUrl: text("source_url").notNull(),
-    // Keep the clean row even if raw evidence is pruned later.
-    rawDocumentId: uuid("raw_document_id").references(() => rawDocuments.id, {
-      onDelete: "set null",
-    }),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }),
 
     // --- name & brand ---
@@ -120,8 +117,8 @@ export const oliveyoungGlobalProducts = pgTable(
 );
 
 /**
- * Time-series snapshots — one row per product per capture date. Appended by the
- * clean-load (`platform:load`) using the raw envelope's fetch date, so history
+ * Time-series snapshots — one row per product per capture date. Appended by
+ * Phase 1 ingestion (`ingest:api`) using each fetch's date, so history
  * accumulates as products are re-ingested over time. This is what powers the
  * dashboard's trends, momentum/velocity, and price-drop / OOS alerts — none of
  * which the latest-snapshot `oliveyoung_global_products` table can express.

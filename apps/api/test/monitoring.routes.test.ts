@@ -9,17 +9,7 @@ function makeConfig(databaseUrl: string): AppConfig {
     API_PORT: 0,
     API_HOST: "127.0.0.1",
     DATABASE_URL: databaseUrl,
-    DO_SPACES_FORCE_PATH_STYLE: false,
     INGEST_FETCH_TIMEOUT_MS: 15_000,
-    TRANSFORM_MAX_DOCUMENTS: 100,
-    AI_PROVIDER: "mock",
-    AI_MODEL: "mistral-small-latest",
-    AI_REVIEW_MAX_ITEMS: 20,
-    AI_TIMEOUT_MS: 30_000,
-    AI_MAX_RETRIES: 2,
-    PROMOTION_MAX_ITEMS: 50,
-    FACTS_MAX_PRODUCTS: 500,
-    ENRICH_MAX_PRODUCTS: 500,
   };
 }
 
@@ -63,8 +53,8 @@ describe("monitoring routes — validation & static (no database needed)", () =>
     expect(
       body.tables.some((t: { table: string }) => t.table === "oliveyoung_global_products"),
     ).toBe(true);
-    // Clean DIP phases: discovery, raw ingestion, clean store.
-    expect(body.phases).toHaveLength(3);
+    // Clean DIP phases: discovery + ingest-&-clean.
+    expect(body.phases).toHaveLength(2);
     expect(body.phases.some((p: { key: string }) => p.key === "discovery")).toBe(true);
 
     const page = await app.inject({ method: "GET", url: "/monitoring" });

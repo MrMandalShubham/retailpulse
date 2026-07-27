@@ -11,10 +11,6 @@ export default defineConfig({
       "@dip/config": r("./packages/config/src/index.ts"),
       "@dip/domain": r("./packages/domain/src/index.ts"),
       "@dip/db": r("./packages/db/src/index.ts"),
-      "@dip/storage": r("./packages/storage/src/index.ts"),
-      "@dip/ai": r("./packages/ai/src/index.ts"),
-      "@dip/promotion": r("./packages/promotion/src/index.ts"),
-      "@dip/enrichment": r("./packages/enrichment/src/index.ts"),
     },
   },
   test: {

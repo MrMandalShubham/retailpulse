@@ -18,10 +18,8 @@
     "db:migrate": "pnpm --filter @dip/db migrate",
     "db:seed": "pnpm --filter @dip/db seed",
     "db:studio": "pnpm --filter @dip/db studio",
-    "bucket:ensure": "pnpm --filter @dip/storage ensure-bucket",
     "discover:run": "pnpm --filter @dip/worker discover run",
-    "ingest:api": "pnpm --filter @dip/worker ingest-api",
-    "platform:load": "pnpm --filter @dip/worker platform-load"
+    "ingest:api": "pnpm --filter @dip/worker ingest-api"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",

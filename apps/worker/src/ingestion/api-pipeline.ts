@@ -1,17 +1,13 @@
 import { and, eq, inArray, schema, type Db } from "@dip/db";
-import type { RawStorageAdapter } from "@dip/domain";
-import { buildProductRawKey, sha256Hex } from "./keys.js";
+import { mapEnvelopeToCleanProduct, type CleanProduct } from "../platform/oliveyoung-clean.js";
 import type { OyProductResult } from "./oliveyoung.js";
-import { createIngestionRepo } from "./repo.js";
-import type { NewRawDocumentInput, PipelineLogger } from "./pipeline.js";
 
 /**
- * Phase 1 API ingestion pipeline. Reads `pending` products straight from the
- * Phase 0 map (discovered_product_pages), fetches each product's raw API
- * envelope, stores it UNCOMPRESSED in object storage, records a raw_documents
- * pointer, and flips the map row pending -> ingested. This is the explicit
- * Phase 0 -> Phase 1 hand-off. Writes ONLY the raw layer + the map status;
- * never the normalized core.
+ * Storage-free ingest cycle. Reads `pending` products from the Phase 0 map,
+ * fetches each product's API envelope IN MEMORY, transforms it straight into the
+ * clean per-platform table + a time-series snapshot, and flips the map row to
+ * `ingested`. No object storage, no raw layer — the clean table IS the product.
+ * A failed fetch leaves the map row pending so a later run retries it.
  */
 
 export interface PendingProduct {
@@ -20,48 +16,55 @@ export interface PendingProduct {
   productUrl: string;
 }
 
-export interface ApiIngestionRepo {
+export interface SyncLogger {
+  info(obj: unknown, msg?: string): void;
+  warn(obj: unknown, msg?: string): void;
+  error(obj: unknown, msg?: string): void;
+}
+
+export interface SyncRepo {
   getSourceBySlug(slug: string): Promise<{ id: string; slug: string } | null>;
   listPendingProducts(sourceId: string, limit: number): Promise<PendingProduct[]>;
-  createCrawlJob(sourceId: string): Promise<{ id: string }>;
-  markJobRunning(jobId: string): Promise<void>;
-  markJobFinished(
-    jobId: string,
+  createRun(sourceId: string): Promise<{ id: string }>;
+  finishRun(
+    runId: string,
     status: "succeeded" | "failed",
     errorMessage?: string | null,
   ): Promise<void>;
-  insertRawDocument(doc: NewRawDocumentInput): Promise<void>;
+  upsertClean(row: CleanProduct): Promise<void>;
+  upsertSnapshot(row: CleanProduct): Promise<void>;
   markProductsIngested(ids: string[]): Promise<void>;
 }
 
-export interface ApiPipelineDeps {
-  repo: ApiIngestionRepo;
-  storage: RawStorageAdapter;
+export interface SyncDeps {
+  repo: SyncRepo;
   fetchProduct(productId: string, productUrl: string): Promise<OyProductResult>;
-  logger: PipelineLogger;
+  logger: SyncLogger;
   sourceSlug: string;
   maxProducts: number;
   /** Politeness delay between product fetches. */
   interRequestDelayMs?: number;
 }
 
-export interface ApiCycleSummary {
+export interface SyncSummary {
   sourceSlug: string;
-  jobId: string | null;
-  productsConsidered: number;
-  documentsOk: number;
-  documentsFailed: number;
+  runId: string | null;
+  considered: number;
+  cleaned: number;
+  snapshots: number;
+  failed: number;
   markedIngested: number;
   status: "succeeded" | "failed" | "skipped";
 }
 
-export async function runApiIngestionCycle(deps: ApiPipelineDeps): Promise<ApiCycleSummary> {
-  const skip = (status: ApiCycleSummary["status"]): ApiCycleSummary => ({
+export async function runSyncCycle(deps: SyncDeps): Promise<SyncSummary> {
+  const skip = (status: SyncSummary["status"]): SyncSummary => ({
     sourceSlug: deps.sourceSlug,
-    jobId: null,
-    productsConsidered: 0,
-    documentsOk: 0,
-    documentsFailed: 0,
+    runId: null,
+    considered: 0,
+    cleaned: 0,
+    snapshots: 0,
+    failed: 0,
     markedIngested: 0,
     status,
   });
@@ -78,12 +81,11 @@ export async function runApiIngestionCycle(deps: ApiPipelineDeps): Promise<ApiCy
     return skip("skipped");
   }
 
-  const { id: jobId } = await deps.repo.createCrawlJob(source.id);
-  await deps.repo.markJobRunning(jobId);
-  deps.logger.info({ source: deps.sourceSlug, jobId, products: products.length }, "api ingest started");
+  const { id: runId } = await deps.repo.createRun(source.id);
+  deps.logger.info({ source: deps.sourceSlug, runId, products: products.length }, "ingest started");
 
-  let documentsOk = 0;
-  let documentsFailed = 0;
+  let cleaned = 0;
+  let failed = 0;
   const ingestedIds: string[] = [];
 
   try {
@@ -91,121 +93,62 @@ export async function runApiIngestionCycle(deps: ApiPipelineDeps): Promise<ApiCy
       if (i > 0 && deps.interRequestDelayMs) {
         await new Promise((resolve) => setTimeout(resolve, deps.interRequestDelayMs));
       }
-      const fetchedAt = new Date();
       const result = await deps.fetchProduct(product.productId, product.productUrl);
-      const storageKey = buildProductRawKey({
-        sourceSlug: source.slug,
-        crawlJobId: jobId,
-        productId: product.productId,
-        fetchedAt,
-      });
-
-      if (result.ok) {
-        // Store the raw envelope UNCOMPRESSED (.json) — gzip is deferred to the
-        // end-of-flow archival step and never runs here.
-        await deps.storage.put(storageKey, result.bytes, "application/json");
-        await deps.repo.insertRawDocument({
-          crawlJobId: jobId,
-          sourceId: source.id,
-          url: product.productUrl,
-          contentType: "application/json",
-          storageKey,
-          checksum: sha256Hex(result.bytes),
-          status: "ok",
-          httpStatus: result.httpStatus,
-          responseBytes: result.bytes.byteLength,
-          errorMessage: null,
-          fetchedAt,
-        });
-        // Raw page HTML — extra evidence stored alongside (own pointer row).
-        // Best-effort: a failed page fetch never blocks the envelope.
-        if (result.htmlBytes) {
-          const htmlKey = buildProductRawKey({
-            sourceSlug: source.slug,
-            crawlJobId: jobId,
-            productId: product.productId,
-            fetchedAt,
-            extension: "html",
-          });
-          await deps.storage.put(htmlKey, result.htmlBytes, "text/html");
-          await deps.repo.insertRawDocument({
-            crawlJobId: jobId,
-            sourceId: source.id,
-            url: product.productUrl,
-            contentType: "text/html",
-            storageKey: htmlKey,
-            checksum: sha256Hex(result.htmlBytes),
-            status: "ok",
-            httpStatus: result.htmlStatus,
-            responseBytes: result.htmlBytes.byteLength,
-            errorMessage: null,
-            fetchedAt,
-          });
-        }
+      const row = result.ok ? mapEnvelopeToCleanProduct(result.envelope) : null;
+      if (row) {
+        await deps.repo.upsertClean(row);
+        await deps.repo.upsertSnapshot(row);
         ingestedIds.push(product.id);
-        documentsOk += 1;
+        cleaned += 1;
       } else {
-        // Essential endpoint failed — record the failure, leave the map row
-        // pending so a later run can retry it.
-        await deps.repo.insertRawDocument({
-          crawlJobId: jobId,
-          sourceId: source.id,
-          url: product.productUrl,
-          contentType: "application/json",
-          storageKey: null,
-          checksum: null,
-          status: "error",
-          httpStatus: result.httpStatus,
-          responseBytes: null,
-          errorMessage: `detail-data failed (statuses: ${JSON.stringify(result.endpointStatuses)})`,
-          fetchedAt,
-        });
-        documentsFailed += 1;
+        // detail-data failed (delisted / transient) — leave the row pending.
+        failed += 1;
         deps.logger.warn(
-          { source: deps.sourceSlug, productId: product.productId, statuses: result.endpointStatuses },
+          {
+            source: deps.sourceSlug,
+            productId: product.productId,
+            statuses: result.endpointStatuses,
+          },
           "product fetch failed",
         );
       }
     }
 
     if (ingestedIds.length > 0) await deps.repo.markProductsIngested(ingestedIds);
-    const status = documentsOk > 0 ? "succeeded" : "failed";
-    await deps.repo.markJobFinished(
-      jobId,
+    const status = cleaned > 0 ? "succeeded" : "failed";
+    await deps.repo.finishRun(
+      runId,
       status,
       status === "failed" ? `all ${products.length} product fetches failed` : null,
     );
     deps.logger.info(
-      { source: deps.sourceSlug, jobId, documentsOk, documentsFailed, markedIngested: ingestedIds.length },
-      "api ingest complete",
+      { source: deps.sourceSlug, runId, cleaned, failed, markedIngested: ingestedIds.length },
+      "ingest complete",
     );
     return {
       sourceSlug: deps.sourceSlug,
-      jobId,
-      productsConsidered: products.length,
-      documentsOk,
-      documentsFailed,
+      runId,
+      considered: products.length,
+      cleaned,
+      snapshots: cleaned,
+      failed,
       markedIngested: ingestedIds.length,
       status,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await deps.repo.markJobFinished(jobId, "failed", message);
-    deps.logger.error({ source: deps.sourceSlug, jobId, error: message }, "api ingest crashed");
-    return { ...skip("failed"), jobId, productsConsidered: products.length };
+    await deps.repo.finishRun(runId, "failed", message);
+    deps.logger.error({ source: deps.sourceSlug, runId, error: message }, "ingest crashed");
+    return { ...skip("failed"), runId, considered: products.length };
   }
 }
 
-/** Drizzle-backed ApiIngestionRepo: reuses the raw-layer repo, adds map reads. */
-export function createApiIngestionRepo(db: Db): ApiIngestionRepo {
-  const base = createIngestionRepo(db);
+/** Drizzle-backed SyncRepo: map reads + crawl_jobs run log + clean/snapshot writes. */
+export function createSyncRepo(db: Db): SyncRepo {
   const dpp = schema.discoveredProductPages;
+  const prod = schema.oliveyoungGlobalProducts;
+  const snap = schema.oliveyoungGlobalProductSnapshots;
   return {
-    createCrawlJob: base.createCrawlJob,
-    markJobRunning: base.markJobRunning,
-    markJobFinished: base.markJobFinished,
-    insertRawDocument: base.insertRawDocument,
-
     async getSourceBySlug(slug) {
       const [row] = await db
         .select({ id: schema.sources.id, slug: schema.sources.slug })
@@ -216,21 +159,57 @@ export function createApiIngestionRepo(db: Db): ApiIngestionRepo {
     },
 
     async listPendingProducts(sourceId, limit) {
-      const rows = await db
+      return db
         .select({ id: dpp.id, productId: dpp.productId, productUrl: dpp.productUrl })
         .from(dpp)
         .where(and(eq(dpp.sourceId, sourceId), eq(dpp.batchStatus, "pending")))
         .orderBy(dpp.createdAt)
         .limit(limit);
-      return rows;
+    },
+
+    async createRun(sourceId) {
+      const [row] = await db
+        .insert(schema.crawlJobs)
+        .values({ sourceId, status: "running", startedAt: new Date() })
+        .returning({ id: schema.crawlJobs.id });
+      if (!row) throw new Error("failed to create ingest run");
+      return row;
+    },
+
+    async finishRun(runId, status, errorMessage) {
+      await db
+        .update(schema.crawlJobs)
+        .set({ status, finishedAt: new Date(), errorMessage: errorMessage ?? null })
+        .where(eq(schema.crawlJobs.id, runId));
+    },
+
+    async upsertClean(row) {
+      await db
+        .insert(prod)
+        .values(row)
+        .onConflictDoUpdate({ target: prod.productId, set: { ...row, updatedAt: new Date() } });
+    },
+
+    async upsertSnapshot(row) {
+      // captured_at = the fetch date (real observation date). Idempotent per day.
+      const capturedAt = (row.fetchedAt ?? new Date()).toISOString().slice(0, 10);
+      const values = {
+        regularPrice: row.regularPrice,
+        salePrice: row.salePrice,
+        discountRate: row.discountRate,
+        avgRating: row.avgRating,
+        reviewCount: row.reviewCount,
+        stockQty: row.stockQty,
+      };
+      await db
+        .insert(snap)
+        .values({ productId: row.productId, capturedAt, ...values })
+        .onConflictDoUpdate({ target: [snap.productId, snap.capturedAt], set: values });
     },
 
     async markProductsIngested(ids) {
       if (ids.length === 0) return;
-      await db
-        .update(dpp)
-        .set({ batchStatus: "ingested" })
-        .where(inArray(dpp.id, ids));
+      await db.update(dpp).set({ batchStatus: "ingested" }).where(inArray(dpp.id, ids));
     },
   };
 }

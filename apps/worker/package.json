@@ -8,14 +8,12 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "ingest-api": "tsx src/ingest-api.ts",
-    "platform-load": "tsx src/platform-load.ts",
     "discover": "tsx src/discover.ts"
   },
   "dependencies": {
     "@dip/config": "workspace:*",
     "@dip/db": "workspace:*",
     "@dip/domain": "workspace:*",
-    "@dip/storage": "workspace:*",
     "dotenv": "^16.5.0",
     "pino": "^9.7.0"
   },

@@ -16,22 +16,5 @@ services:
       timeout: 3s
       retries: 10
 
-  # Local S3-compatible stand-in for DigitalOcean Spaces (approved for Phase 2
-  # verification). Production points the same DO_SPACES_* env vars at real
-  # Spaces — no code changes.
-  minio:
-    image: minio/minio:latest
-    container_name: dip-engine-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: dip-minio
-      MINIO_ROOT_PASSWORD: dip-minio-secret
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - dip_minio_data:/data
-
 volumes:
   dip_pgdata:
-  dip_minio_data:

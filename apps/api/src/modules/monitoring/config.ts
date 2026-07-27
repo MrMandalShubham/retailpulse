@@ -4,7 +4,7 @@
  * declared here; the generic queries are generated from this config.
  */
 
-export type Layer = "discovery" | "raw" | "clean";
+export type Layer = "discovery" | "ingest" | "clean";
 
 export interface TableMonitor {
   table: string;
@@ -21,26 +21,19 @@ export interface TableMonitor {
 }
 
 export const CORE_TABLES: TableMonitor[] = [
-  // ---- Raw / ingestion layer ----
+  // ---- Ingestion-control layer ----
   {
     table: "sources",
     label: "Sources",
-    layer: "raw",
+    layer: "ingest",
     importantColumns: ["name", "slug", "base_url"],
     dedupKey: ["slug"],
   },
   {
     table: "crawl_jobs",
-    label: "Crawl Jobs",
-    layer: "raw",
+    label: "Ingest Runs",
+    layer: "ingest",
     importantColumns: ["status"],
-  },
-  {
-    table: "raw_documents",
-    label: "Raw Documents",
-    layer: "raw",
-    createdAtColumn: "fetched_at",
-    importantColumns: ["url", "storage_key", "status", "checksum"],
   },
 
   // ---- Discovery (Phase 0) ----
@@ -54,7 +47,13 @@ export const CORE_TABLES: TableMonitor[] = [
     table: "discovered_product_pages",
     label: "Discovered Product Pages",
     layer: "discovery",
-    importantColumns: ["product_id", "product_name", "product_url", "normalized_url", "batch_status"],
+    importantColumns: [
+      "product_id",
+      "product_name",
+      "product_url",
+      "normalized_url",
+      "batch_status",
+    ],
     dedupKey: ["source_id", "product_id"],
   },
 
@@ -73,6 +72,14 @@ export const CORE_TABLES: TableMonitor[] = [
       "avg_rating",
     ],
     dedupKey: ["product_id"],
+  },
+  {
+    table: "oliveyoung_global_product_snapshots",
+    label: "Olive Young — Daily Snapshots",
+    layer: "clean",
+    createdAtColumn: "captured_at",
+    importantColumns: ["product_id", "captured_at"],
+    dedupKey: ["product_id", "captured_at"],
   },
 ];
 
@@ -106,24 +113,12 @@ export const PHASES: PhaseMonitor[] = [
   },
   {
     id: 1,
-    key: "raw_ingestion",
-    name: "Raw API Ingestion",
+    key: "ingest_clean",
+    name: "Ingest & Clean",
     runTable: "crawl_jobs",
     statusColumn: "status",
     startedColumn: "started_at",
     finishedColumn: "finished_at",
-    processedColumn: null,
-    failedColumn: null,
-    outputTable: "raw_documents",
-  },
-  {
-    id: 2,
-    key: "clean_store",
-    name: "Clean Product Store",
-    runTable: null,
-    statusColumn: "",
-    startedColumn: "",
-    finishedColumn: "",
     processedColumn: null,
     failedColumn: null,
     outputTable: "oliveyoung_global_products",

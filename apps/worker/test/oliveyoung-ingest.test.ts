@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  fetchOliveYoungProduct,
-  gzipEnvelope,
-  type GetHtmlResult,
-  type PostJsonResult,
-} from "../src/ingestion/oliveyoung.js";
+import { fetchOliveYoungProduct, type PostJsonResult } from "../src/ingestion/oliveyoung.js";
 
 /** Mock postJson: canned per-endpoint responses keyed by the endpoint path. */
 function mockPost(
@@ -16,12 +11,8 @@ function mockPost(
   };
 }
 
-const htmlOk: GetHtmlResult = { status: 200, body: new TextEncoder().encode("<html>raw</html>") };
-const htmlFail: GetHtmlResult = { status: 403, body: null };
-const getHtml = (result: GetHtmlResult) => async () => result;
-
 describe("fetchOliveYoungProduct", () => {
-  it("assembles a verbatim envelope from all three endpoints + page html", async () => {
+  it("assembles a verbatim in-memory envelope from all three endpoints", async () => {
     const post = mockPost({
       "detail-data": {
         ok: true,
@@ -29,12 +20,15 @@ describe("fetchOliveYoungProduct", () => {
         json: { product: { prdtName: "X", prdtGbnCode: "10" } },
       },
       "details-info": { ok: true, status: 200, json: { details: { howToUseText: "apply" } } },
-      "review-summary": { ok: true, status: 200, json: { totalStarRate: 4.7, totalReviewCount: 1356 } },
+      "review-summary": {
+        ok: true,
+        status: 200,
+        json: { totalStarRate: 4.7, totalReviewCount: 1356 },
+      },
     });
 
     const res = await fetchOliveYoungProduct("GA1", "https://x/product/detail?prdtNo=GA1", "oy", {
       postJson: post,
-      getHtml: getHtml(htmlOk),
     });
 
     expect(res.ok).toBe(true);
@@ -51,14 +45,11 @@ describe("fetchOliveYoungProduct", () => {
       "detail-data": 200,
       "details-info": 200,
       "review-summary": 200,
-      "page-html": 200,
     });
-    // Raw page HTML captured alongside.
-    expect(res.htmlBytes).not.toBeNull();
-    expect(res.htmlStatus).toBe(200);
-    // Bytes round-trip back to the same JSON (nothing lost).
-    const parsed = JSON.parse(new TextDecoder().decode(res.bytes));
-    expect(parsed.endpoints["review-summary"].totalStarRate).toBe(4.7);
+    // Endpoint payloads kept verbatim (nothing lost).
+    expect(
+      (res.envelope.endpoints["review-summary"] as { totalStarRate: number }).totalStarRate,
+    ).toBe(4.7);
   });
 
   it("sends the captured review-summary body with prdtGbnCode from detail-data", async () => {
@@ -70,10 +61,7 @@ describe("fetchOliveYoungProduct", () => {
         return { ok: true, status: 200, json: { product: { prdtGbnCode: "20" } } };
       return { ok: true, status: 200, json: {} };
     };
-    await fetchOliveYoungProduct("GA9", "https://x?prdtNo=GA9", "oy", {
-      postJson: post,
-      getHtml: getHtml(htmlOk),
-    });
+    await fetchOliveYoungProduct("GA9", "https://x?prdtNo=GA9", "oy", { postJson: post });
     expect(bodies["review-summary"]).toMatchObject({
       prdtNo: "GA9",
       prdtGbnCode: "20", // threaded from detail-data, not hardcoded
@@ -82,7 +70,7 @@ describe("fetchOliveYoungProduct", () => {
     });
   });
 
-  it("still saves when review-summary or the page html fails (detail-data is essential)", async () => {
+  it("still succeeds when review-summary fails (detail-data is the essential endpoint)", async () => {
     const post = mockPost({
       "detail-data": { ok: true, status: 200, json: { product: { prdtName: "X" } } },
       "details-info": { ok: true, status: 200, json: { details: {} } },
@@ -91,14 +79,11 @@ describe("fetchOliveYoungProduct", () => {
 
     const res = await fetchOliveYoungProduct("GA2", "https://x?prdtNo=GA2", "oy", {
       postJson: post,
-      getHtml: getHtml(htmlFail),
     });
 
-    expect(res.ok).toBe(true); // detail-data succeeded → envelope is worth saving
+    expect(res.ok).toBe(true); // detail-data succeeded → envelope is worth keeping
     expect(res.envelope.endpoints["review-summary"]).toBeNull();
     expect(res.envelope.http_status["review-summary"]).toBe(500);
-    expect(res.htmlBytes).toBeNull(); // page fetch failed → no .html artifact
-    expect(res.envelope.http_status["page-html"]).toBe(403);
   });
 
   it("reports failure when the essential endpoint fails", async () => {
@@ -109,14 +94,7 @@ describe("fetchOliveYoungProduct", () => {
     });
     const res = await fetchOliveYoungProduct("GA3", "https://x?prdtNo=GA3", "oy", {
       postJson: post,
-      getHtml: getHtml(htmlOk),
     });
     expect(res.ok).toBe(false);
-  });
-
-  it("gzipEnvelope compresses the raw bytes (available, but not used by ingestion)", () => {
-    const big = new TextEncoder().encode(JSON.stringify({ a: "z".repeat(2000) }));
-    const gz = gzipEnvelope(big);
-    expect(gz.byteLength).toBeLessThan(big.byteLength);
   });
 });

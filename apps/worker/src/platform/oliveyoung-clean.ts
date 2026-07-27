@@ -13,7 +13,6 @@ export interface CleanProduct {
   productId: string;
   barcode: string | null;
   sourceUrl: string;
-  rawDocumentId: string | null;
   fetchedAt: Date | null;
   nameEn: string | null;
   nameKr: string | null;
@@ -62,14 +61,55 @@ export interface CleanProduct {
 }
 
 const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
-  reg: "®", trade: "™", copy: "©", deg: "°", hellip: "…", bull: "•", middot: "·",
-  mdash: "—", ndash: "–", lsquo: "'", rsquo: "'", ldquo: '"', rdquo: '"',
-  times: "×", divide: "÷", frac12: "½", frac14: "¼", frac34: "¾", plusmn: "±",
-  eacute: "é", egrave: "è", agrave: "à", acirc: "â", uuml: "ü", ouml: "ö",
-  auml: "ä", ntilde: "ñ", ccedil: "ç", szlig: "ß", iexcl: "¡", euro: "€", pound: "£",
-  alpha: "α", beta: "β", gamma: "γ", delta: "δ", omega: "ω", micro: "µ", mu: "μ",
-  pi: "π", rarr: "→", larr: "←", harr: "↔",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  reg: "®",
+  trade: "™",
+  copy: "©",
+  deg: "°",
+  hellip: "…",
+  bull: "•",
+  middot: "·",
+  mdash: "—",
+  ndash: "–",
+  lsquo: "'",
+  rsquo: "'",
+  ldquo: '"',
+  rdquo: '"',
+  times: "×",
+  divide: "÷",
+  frac12: "½",
+  frac14: "¼",
+  frac34: "¾",
+  plusmn: "±",
+  eacute: "é",
+  egrave: "è",
+  agrave: "à",
+  acirc: "â",
+  uuml: "ü",
+  ouml: "ö",
+  auml: "ä",
+  ntilde: "ñ",
+  ccedil: "ç",
+  szlig: "ß",
+  iexcl: "¡",
+  euro: "€",
+  pound: "£",
+  alpha: "α",
+  beta: "β",
+  gamma: "γ",
+  delta: "δ",
+  omega: "ω",
+  micro: "µ",
+  mu: "μ",
+  pi: "π",
+  rarr: "→",
+  larr: "←",
+  harr: "↔",
 };
 
 /**
@@ -83,7 +123,10 @@ function decodeEntities(s: string): string {
     const next = out
       .replace(/&#(\d+);/g, (_, n) => codePoint(Number(n)))
       .replace(/&#x([0-9a-f]+);/gi, (_, h) => codePoint(Number.parseInt(h, 16)))
-      .replace(/&([a-z][a-z0-9]*);/gi, (m, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
+      .replace(
+        /&([a-z][a-z0-9]*);/gi,
+        (m, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? m,
+      );
     if (next === out) break;
     out = next;
   }
@@ -188,7 +231,8 @@ const EDITION_RE = /^\s*\[[^\]]*\]\s*/;
 const GIFT_RE = /\(\s*(\+[^)]*|[^)]*\bgift\b[^)]*)\)/i;
 const SIZE_RE = /(\d+(?:\.\d+)?)\s?(ml|g|kg|ea|pcs|sheets?|매|팩|정|캡슐|장)\b/i;
 const SIZE_RE_G = new RegExp(SIZE_RE.source, "gi");
-const SET_RE = /\s+((?:special|double|refill|gift|value|jumbo|duo|mini|travel|limited)\s+)*(set|pack|duo|kit)\s*$/i;
+const SET_RE =
+  /\s+((?:special|double|refill|gift|value|jumbo|duo|mini|travel|limited)\s+)*(set|pack|duo|kit)\s*$/i;
 
 /**
  * Split a raw Olive Young product name into parts (heuristic; name_en stays the
@@ -330,7 +374,7 @@ export function extractKeyIngredients(text: string | null): string[] {
  * detail-data is missing (delisted/failed fetches) — those never enter the
  * clean store.
  */
-export function mapEnvelopeToCleanProduct(env: any, rawDocumentId: string | null): CleanProduct | null {
+export function mapEnvelopeToCleanProduct(env: any): CleanProduct | null {
   const d = env?.endpoints?.["detail-data"]?.product;
   if (!d || typeof d !== "object") return null;
   const info = env?.endpoints?.["details-info"]?.details ?? {};
@@ -349,7 +393,6 @@ export function mapEnvelopeToCleanProduct(env: any, rawDocumentId: string | null
     productId,
     barcode: clean(d.gdsCd),
     sourceUrl: typeof env?.source_url === "string" ? env.source_url : "",
-    rawDocumentId,
     fetchedAt: env?.fetched_at ? new Date(env.fetched_at) : null,
     nameEn,
     nameKr: clean(d.korPrdtName ?? d.prdtName),

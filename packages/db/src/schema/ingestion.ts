@@ -1,4 +1,4 @@
-import { CRAWL_JOB_STATUSES, RAW_DOCUMENT_STATUSES, SOURCE_TYPES } from "@dip/domain";
+import { CRAWL_JOB_STATUSES, SOURCE_TYPES } from "@dip/domain";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -14,11 +14,13 @@ import {
 import { inList } from "./helpers.js";
 
 /**
- * Raw ELT layer: sources -> crawl_jobs -> raw_documents.
+ * Ingestion-control layer: sources -> crawl_jobs.
  *
- * ON DELETE design: deletion cascades downward (sources -> crawl_jobs ->
- * raw_documents) — removing a source config intentionally discards its
- * ingestion history.
+ * crawl_jobs is the fetch-run log — one row per `ingest:api` run (started /
+ * finished / status). There is no raw_documents table: ingestion fetches each
+ * product's API envelope in memory and writes it straight to the clean
+ * per-platform store, so nothing raw is persisted. Deleting a source cascades
+ * to its crawl_jobs, discarding that source's run history.
  */
 
 /** External websites / APIs we ingest from. */
@@ -76,35 +78,5 @@ export const crawlJobs = pgTable(
     index("crawl_jobs_source_id_idx").on(table.sourceId),
     index("crawl_jobs_status_idx").on(table.status),
     index("crawl_jobs_created_at_idx").on(table.createdAt),
-  ],
-);
-
-/** One fetched URL within a crawl job (payload lives in object storage). */
-export const rawDocuments = pgTable(
-  "raw_documents",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    crawlJobId: uuid("crawl_job_id")
-      .notNull()
-      .references(() => crawlJobs.id, { onDelete: "cascade" }),
-    sourceId: uuid("source_id")
-      .notNull()
-      .references(() => sources.id, { onDelete: "cascade" }),
-    url: text("url").notNull(),
-    contentType: text("content_type"),
-    storageKey: text("storage_key"),
-    checksum: text("checksum"),
-    status: text("status").notNull(),
-    httpStatus: integer("http_status"),
-    responseBytes: integer("response_bytes"),
-    errorMessage: text("error_message"),
-    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    check("raw_documents_status_check", inList("status", RAW_DOCUMENT_STATUSES)),
-    index("raw_documents_crawl_job_id_idx").on(table.crawlJobId),
-    index("raw_documents_source_id_fetched_at_idx").on(table.sourceId, table.fetchedAt),
-    index("raw_documents_url_idx").on(table.url),
   ],
 );

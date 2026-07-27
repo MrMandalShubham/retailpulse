@@ -324,7 +324,7 @@
       <section class="tab active" id="tab-overview">
         <h2>Summary</h2>
         <div class="cards" id="cards"></div>
-        <h2>Workflow phases (P0 → P2)</h2>
+        <h2>Workflow phases (P0 → P1)</h2>
         <div class="phase" id="phases"></div>
         <h2>Attention</h2>
         <div id="ovAlerts"></div>
@@ -627,8 +627,8 @@
           ["Products discovered", c.discovered],
           ["Pending ingest", c.pending],
           ["Ingested", c.ingested],
-          ["Raw documents", c.rawDocs],
           ["Clean products", c.cleanProducts],
+          ["Daily snapshots", c.snapshots],
           ["Critical alerts", o.alertCounts.critical],
           ["Warnings", o.alertCounts.warning],
         ]
@@ -684,7 +684,9 @@
         $("discRuns").querySelector("tbody").innerHTML = d.recentRuns.length
           ? d.recentRuns
               .map(
-                (r) => `<tr><td>${esc(r.source)}</td><td><span class="badge">${esc(r.strategy)}</span></td>
+                (
+                  r,
+                ) => `<tr><td>${esc(r.source)}</td><td><span class="badge">${esc(r.strategy)}</span></td>
     <td>${dot(r.status)}${esc(r.status)}</td><td class="r"><b>${r.urls_discovered}</b></td>
     <td class="r" style="color:var(--ok)">${r.new_urls}</td><td class="r">${r.updated_urls}</td>
     <td class="r" style="color:${r.errors > 0 ? "var(--bad)" : "inherit"}">${r.errors}</td>

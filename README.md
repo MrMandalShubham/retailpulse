@@ -1,88 +1,66 @@
 # DIP Engine
 
-Production-grade data ingestion and normalization platform for global product
-intelligence. DIP Engine scrapes product-related websites, lands raw data in a
-raw layer (ELT), transforms it with AI + deterministic rules, and publishes
-clean records into a normalized 8-table core that powers product comparison,
-dashboards, reports, and a private AI.
+A data ingestion platform for global beauty-product intelligence. DIP Engine
+maps a source's catalog, then fetches each product's own JSON APIs and cleans
+the result into one typed row per product — the clean per-platform store is the
+end product that powers comparison, dashboards, and reports.
 
-**Current status: Phase 6 — fact layer and market mapping.**
-The catalog is now measurable over time: append-only `product_price_facts` /
-`product_rating_facts` (observation grain, full provenance, `market_id`
-nullable = honestly unknown), honest source→market mapping in
-`source_markets`, and the first gated writes to the V1 core fact tables
-(`retail_pulse_prices` weekly, `voice_pulse_reviews` monthly — only when the
-market is known; first observation per period wins). `XG` ("Global
-(Cross-border)") is an internal user-assigned code for genuinely global
-storefronts — never presented as a country. Freshness/coverage/source health
-are computed live at `/freshness/stats`, `/coverage/stats`,
-`/sources/:id/health`. Run with `pnpm facts:run`.
+**Architecture: a storage-free 2-step engine.**
 
-Previous phase summary (Phase 5 — canonical promotion and product experience layer):
-`@dip/promotion` is the single gateway that turns validated staging into
-canonical truth: confidence/validation-gated, transactional, idempotent
-(normalized `source_url` uniqueness), dedup-aware (exact + fuzzy within brand;
-ambiguity stays staged), and fully audited (`promotion_runs`/`promotion_items`
-with operator notes). The canonical catalog is searchable (Postgres FTS over
-`product_search_documents`) through `/products*` endpoints, promotion is
-operated through `/promotion*`, and a minimal internal dashboard lives at
-`/dashboard`.
+```
+Phase 0                Phase 1
+DISCOVER        ──►     INGEST + CLEAN        ──►  oliveyoung_global_products
+ (the map)             (fetch API in memory,       (THE end product)
+                        clean → typed row)        + oliveyoung_global_product_snapshots
+```
 
-Previous phase summary (Phase 4 — AI-assisted review and selective escalation):
-A provider-agnostic AI layer reviews ONLY the unresolved leftovers from the
-Phase 3 transform (gated: `ai_recommended` staged products and open
-field-level observations). Business logic talks to internal review contracts;
-vendors are adapters (`@dip/ai`: Mistral via plain REST + a deterministic
-mock, default `AI_PROVIDER=mock` so nothing calls a paid API accidentally).
-AI decisions are structured, validated, and advisory — rule candidates land in
-`ai_rule_suggestions` and become `normalization_rules` (learned_from_ai) only
-through the operator approval endpoint. Canonical tables remain untouched.
+1. **Discover** — map the source's full catalog into `discovered_product_pages`
+   (identity `(source_id, product_id)`; `batch_status` pending → ingested).
+2. **Ingest + Clean** — for each pending product, fetch its JSON envelope from
+   the source's own APIs (detail-data + details-info + review-summary) **in
+   memory**, transform it into one clean typed row (HTML entities decoded,
+   prices as numbers, Y/N → boolean, category path split, name/ingredients
+   parsed), and append a daily time-series snapshot. Nothing raw is persisted —
+   the map can always re-drive a fresh fetch.
 
-Previous phase summary (Phase 3 — hybrid transform + normalization engine):
-On top of the Phase 2 raw layer, a local (no-AI) transform pipeline extracts
-product candidates from raw HTML (title/meta/OpenGraph/JSON-LD/DOM heuristics),
-normalizes them with reusable `normalization_rules` (brand aliases, currency
-hints, keyword mappings, fuzzy matching), classifies page types, scores
-field-level confidence, and records unresolved leftovers as
-`transform_observations` for **future** AI escalation. Repeated discoveries
-become rules, so every run needs less AI. No LLM calls, no browser scraping,
-no writes into the canonical 8-table core (promotion is a Phase 4 contract).
+There is no object storage and no raw layer. Earlier versions landed raw
+envelopes in DigitalOcean Spaces / MinIO and a `raw_documents` table before a
+separate clean-load; that round-trip had no effect on the final clean row, so it
+was removed (migration `0017`). An even earlier "middle chain" (AI transform →
+promotion → normalized core-8) was retired first (migration `0013`). Both are
+restorable via the git tag `pre-retire-middle-chain`.
 
 ## Repository layout
 
 ```
 apps/
-  api/          Fastify backend (health + raw-ingestion monitoring; query APIs later)
-  worker/       Ingestion worker: one-shot raw fetch pipeline + idle skeleton
+  api/          Fastify backend (health + ingestion/monitoring consoles)
+  worker/       The engine: discover + ingest-clean CLIs, discovery/ingestion/platform code
 packages/
   config/       @dip/config — zod-validated environment loader (single env source of truth)
   domain/       @dip/domain — shared domain contracts (pure types, no runtime deps)
   db/           @dip/db — Drizzle schema, pg client, SQL migrations, seed script
-  storage/      @dip/storage — S3-compatible raw object storage (Spaces/MinIO)
-  ai/           @dip/ai — provider-agnostic AI review (prompt contract, Mistral + mock adapters)
-  promotion/    @dip/promotion — the ONLY canonical write gateway (matching, dedup, audit)
-services/       Reserved for Python services (advanced scraping, AI transform — Phase 3+)
+deploy/         DigitalOcean deploy kit (setup script, env template, cron, guide)
+playbooks/      Per-source tested discovery + ingestion contracts
 ```
 
-The normalized V1 core is exactly 8 tables: `products_master` (canonical hub),
-`brands`, `categories`, `product_types`, `markets`, `product_markets` (bridge),
-`retail_pulse_prices` and `voice_pulse_reviews` (append-only facts).
+## The schema: 5 tables
 
-The raw ELT layer (Phase 2) adds `sources`, `crawl_jobs`, and `raw_documents` —
-a strictly separate data flow: nothing in the normalized core references the
-raw layer, and the Phase 2 pipeline never writes to the core.
-
-The staging/transform layer (Phase 3) adds `transform_runs`, `staged_products`,
-`normalization_rules`, and `transform_observations`. Three-layer rule:
-**raw = immutable evidence · staging = regenerable working data · canonical =
-curated truth** (written only via explicit promotion, Phase 4). Staged rows can
-be deleted and regenerated from raw at any time (`--reprocess`).
+- `sources`, `crawl_jobs` — ingestion-control layer. `crawl_jobs` is the
+  fetch-run log (one row per `ingest:api` run).
+- `discovery_runs`, `discovered_product_pages` — the Phase 0 catalog map.
+- `oliveyoung_global_products` — the clean per-platform end product (one typed
+  row per product; nested data as cleaned JSONB). **Per-platform by design** —
+  each source's API exposes different fields, so the next platform gets its own
+  `<platform>_products` table.
+- `oliveyoung_global_product_snapshots` — append-only daily observations
+  (price/rating/review-count/stock), keyed `(product_id, captured_at)`.
 
 ## Prerequisites
 
 - Node.js >= 22
 - pnpm >= 9
-- Docker Desktop (for local Postgres)
+- Docker Desktop (for local Postgres) — or any reachable Postgres URL
 
 ## Setup
 
@@ -93,7 +71,7 @@ pnpm install
 # 2. Create your local environment file
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 
-# 3. Start local Postgres + MinIO (S3-compatible stand-in for DO Spaces)
+# 3. Start local Postgres
 docker compose up -d
 
 # 4. Build workspace packages (internal packages resolve from dist/)
@@ -102,106 +80,45 @@ pnpm build
 # 5. Apply database migrations
 pnpm db:migrate
 
-# 6. Seed the approved ingestion source (Olive Young Global)
+# 6. Seed the approved source (Olive Young Global)
 pnpm db:seed
 
-# 7. Create the raw-storage bucket in MinIO (once)
-pnpm bucket:ensure
+# 7. Map the catalog into discovered_product_pages
+pnpm discover:run
 
-# 8. Run one raw ingestion cycle (fetch seed URLs -> MinIO + raw_documents)
-pnpm ingest:run
+# 8. Fetch + clean the first 3 pending products into the clean store
+pnpm ingest:api oliveyoung-global 3
 
-# 9. Run one hybrid transform cycle (raw docs -> staged_products + observations)
-pnpm transform:run
-
-# 10. Run one AI review cycle over unresolved leftovers (mock provider by default)
-pnpm ai-review:run
-
-# 11. Promote eligible staged products into the canonical catalog
-pnpm promote:run
-
-# 12. Run the API (http://localhost:3000) — operator dashboard at /dashboard
+# 9. Run the API (http://localhost:3000) — observability console at /monitoring
 pnpm dev:api
 ```
 
 Verify: `GET http://localhost:3000/health` (liveness) and
 `GET http://localhost:3000/health/ready` (database readiness).
 
-### Watching raw ingestion
+## Watching the engine
 
 - `GET /ingestion/sources` — configured sources and their seed URLs.
-- `GET /ingestion/jobs?sourceId=&limit=` — recent crawl jobs with status,
-  timing, and `rawDocumentCount` per job.
-- `GET /ingestion/jobs/:id/raw-documents` — every fetched URL of a job with
-  HTTP status, storage key, checksum, and size.
-
-The MinIO console at http://localhost:9001 (user `dip-minio`, password
-`dip-minio-secret`) shows the stored raw payloads under `dip-engine-raw/raw/…`.
-
-### Watching the transform layer
-
-- `GET /transforms/runs` and `/transforms/runs/:id` — run history with
-  document counters plus staged/observation counts.
-- `GET /transforms/staged-products?validationStatus=&sourceId=&aiRecommended=` —
-  extracted product candidates with confidence and validation state.
-- `GET /transforms/staged-products/:id` — full candidate detail including
-  field candidates, field confidences, and linked observations.
-- `GET /transforms/observations?status=&type=` — unresolved leftovers queued
-  for future AI review (`unknown_brand`, `conflicting_price`, …).
-- `GET /transforms/rules` — active normalization rules (the system's learned
-  intelligence; rows added here change behavior on the next run, no code).
-
-### Watching the AI review layer
-
-- `GET /ai-reviews/runs` and `/ai-reviews/runs/:id` — review batches with
-  per-status item counts.
-- `GET /ai-reviews/items?status=&provider=` — every item escalated to AI, with
-  `review_reason`, full input payload, raw output, and the parsed decision.
-- `GET /ai-reviews/rule-suggestions?status=` — AI-proposed rules awaiting the
-  approval path.
-- `POST /ai-reviews/rule-suggestions/:id/approve` — the ONLY way an AI
-  suggestion becomes a `normalization_rules` row (`learned_from_ai = true`);
-  also moves the linked observation to `promoted_to_rule`.
-- `POST /ai-reviews/rule-suggestions/:id/reject` — dismiss a bad suggestion.
-
-Provider selection is config-only: `AI_PROVIDER=mock` (default, free) or
-`AI_PROVIDER=mistral` + `MISTRAL_API_KEY`. Swapping vendors later means one
-new adapter file in `packages/ai/src/providers/` — no business-logic changes.
-
-### Canonical catalog & promotion
-
-- `GET /products` — canonical list with filters (brand, category, source,
-  price/rating ranges), sorting, pagination.
-- `GET /products/search?q=` — Postgres full-text search with the same filters.
-- `GET /products/:id` (+ `/sources`, `/media`, `/history`) — detail with
-  provenance, media references, and the complete promotion audit trail.
-- `GET /products/stats` — catalog totals and breakdowns.
-- `GET /promotion/queue` — staged candidates with per-record eligibility.
-- `POST /promotion/run` · `POST /promotion/items/:id/promote` ·
-  `POST /promotion/items/:id/reject` (operator reason required) — the only
-  HTTP surface that can cause canonical writes, always via `@dip/promotion`.
-- `GET /dashboard` — internal operator dashboard (stats, product list/detail,
-  promotion queue with promote/reject, run history).
+- `GET /ingestion/jobs?sourceId=&limit=` — recent ingest runs (status, timing).
+- `GET /monitoring` — the observability console: per-table health (row counts,
+  null-rates, duplicates), phase status, alerts, and a run timeline.
 
 ## Commands
 
-| Command              | What it does                                                                                                                                                                                                     |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm build`         | Build all packages/apps (topological order)                                                                                                                                                                      |
-| `pnpm dev:api`       | Run the API with hot reload                                                                                                                                                                                      |
-| `pnpm dev:worker`    | Run the idle worker skeleton (boot + validate + idle)                                                                                                                                                            |
-| `pnpm ingest:run`    | One-shot raw ingestion cycle (Phase 2 manual trigger): reads enabled sources, fetches up to 5 seed URLs each, stores payloads in object storage, records crawl_jobs + raw_documents                              |
-| `pnpm transform:run` | One-shot hybrid transform cycle (Phase 3, no AI): eligible raw docs → deterministic extraction → rule-based normalization → staged_products + transform_observations. Add `-- --reprocess` to regenerate staging |
-| `pnpm ai-review:run` | One-shot AI review cycle (Phase 4): gated unresolved leftovers → configured provider (`AI_PROVIDER`) → ai_review_items + ai_rule_suggestions. Advisory only; rules change only via the approval endpoint         |
-| `pnpm promote:run`   | One-shot canonical promotion batch (Phase 5): eligible staged products -> @dip/promotion gateway -> canonical tables + provenance + search docs, fully audited                                                   |
-| `pnpm db:seed`       | Idempotent seed of the approved ingestion source                                                                                                                                                                 |
-| `pnpm bucket:ensure` | Create the raw-storage bucket (local MinIO helper)                                                                                                                                                               |
-| `pnpm lint`          | ESLint over the whole repo                                                                                                                                                                                       |
-| `pnpm format`        | Prettier write                                                                                                                                                                                                   |
-| `pnpm test`          | Vitest — DB-independent tests always run; integration tests against a migrated DB run when `TEST_DATABASE_URL` is set                                                                                            |
-| `pnpm db:generate`   | Generate SQL migration from Drizzle schema changes                                                                                                                                                               |
-| `pnpm db:migrate`    | Apply pending migrations from `packages/db/migrations`                                                                                                                                                           |
-| `pnpm db:studio`     | Browse the database with Drizzle Studio                                                                                                                                                                          |
+| Command                      | What it does                                                                                                |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pnpm build`                 | Build all packages/apps (topological order)                                                                 |
+| `pnpm dev:api`               | Run the API with hot reload                                                                                 |
+| `pnpm dev:worker`            | Run the idle worker skeleton (boot + validate + idle)                                                       |
+| `pnpm discover:run`          | Map the source catalog into `discovered_product_pages`                                                      |
+| `pnpm ingest:api [slug] [n]` | Fetch + clean `n` pending products straight into the clean store + snapshots (default: oliveyoung-global 3) |
+| `pnpm db:seed`               | Idempotent seed of the approved ingestion source                                                            |
+| `pnpm lint`                  | ESLint over the whole repo                                                                                  |
+| `pnpm format`                | Prettier write                                                                                              |
+| `pnpm test`                  | Vitest — DB-independent tests always run; integration tests run when `TEST_DATABASE_URL` is set             |
+| `pnpm db:generate`           | Generate a SQL migration from Drizzle schema changes                                                        |
+| `pnpm db:migrate`            | Apply pending migrations from `packages/db/migrations`                                                      |
+| `pnpm db:studio`             | Browse the database with Drizzle Studio                                                                     |
 
 Note: run `pnpm build` before `pnpm db:generate` — the DB schema imports
 vocabulary constants from `@dip/domain`, which resolves from its built output.
@@ -210,18 +127,23 @@ vocabulary constants from `@dip/domain`, which resolves from its built output.
 
 Migrations are plain SQL files in `packages/db/migrations/`, generated by
 drizzle-kit from the schema in `packages/db/src/schema/` and committed to the
-repo. Plain SQL keeps the schema history readable and usable by the future
-Python services. Never edit an applied migration; generate a new one.
+repo. Never edit an applied migration; generate a new one.
+
+## Deployment
+
+See [deploy/DEPLOY.md](deploy/DEPLOY.md) for running DIP Engine on a
+DigitalOcean droplet against a managed Postgres database (setup script, env
+template, and a cron schedule for periodic re-fetches).
 
 ## Architecture rules (approved)
 
-- ELT: raw data always lands first; transforms produce the clean records.
-- Raw layer and the normalized 8-table core stay strictly separated
-  (raw-layer tables arrive in Phase 2).
-- `products_master` is the canonical hub; markets connect via `product_markets`
-  (never duplicate products per country).
-- `retail_pulse_prices` and `voice_pulse_reviews` are append-only in V1.
-- text + CHECK constraints instead of native Postgres enums in V1.
-- Phase-gated delivery: only the current phase is implemented.
+- **No raw layer, no object storage** — ingestion cleans in memory; the clean
+  store + snapshots are the only durable engine outputs.
+- **Re-runnable, not archived** — recovery is re-running `ingest:api` from the
+  map, not restoring a raw copy.
+- Clean store idempotent on `product_id`; snapshots on `(product_id, captured_at)`.
+- text + CHECK constraints instead of native Postgres enums.
+- Approved source: Olive Young Global — do NOT add other live sources without
+  explicit approval.
 
-See [CLAUDE.md](CLAUDE.md) for the full project context and phase scope.
+See [CLAUDE.md](CLAUDE.md) for full project context.

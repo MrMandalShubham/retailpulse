@@ -1,7 +1,8 @@
 /**
- * Ingestion domain — the raw ELT collection layer: sources, crawl jobs, and
- * raw documents. Phase 2 implements "fetch → store raw → record metadata";
- * scheduling/queueing (Redis) and browser rendering arrive in later phases.
+ * Ingestion domain — the ingestion-control layer: sources and crawl jobs.
+ * Phase 1 fetches each product's API envelope in memory and writes it straight
+ * to the clean per-platform store; crawl_jobs is the fetch-run log. No raw
+ * documents are persisted (the raw layer was dropped).
  */
 
 export const SOURCE_TYPES = ["website", "marketplace", "api", "review_platform"] as const;
@@ -9,9 +10,6 @@ export type SourceType = (typeof SOURCE_TYPES)[number];
 
 export const CRAWL_JOB_STATUSES = ["pending", "running", "succeeded", "failed"] as const;
 export type CrawlJobStatus = (typeof CRAWL_JOB_STATUSES)[number];
-
-export const RAW_DOCUMENT_STATUSES = ["ok", "error", "skipped"] as const;
-export type RawDocumentStatus = (typeof RAW_DOCUMENT_STATUSES)[number];
 
 /**
  * Max seed URLs fetched per source per crawl job. Application-level rule
@@ -26,9 +24,8 @@ export interface Source {
   slug: string;
   baseUrl: string;
   sourceType: SourceType;
-  marketId: string | null;
   enabled: boolean;
-  /** URLs fetched per crawl in Phase 2; capped by MAX_SEED_URLS_PER_JOB. */
+  /** URLs fetched per discovery crawl; capped by MAX_SEED_URLS_PER_JOB. */
   seedUrls: string[];
   scrapeStrategy: string | null;
   notes: string | null;
@@ -49,25 +46,3 @@ export interface CrawlJob {
   createdAt: string;
   updatedAt: string;
 }
-
-/** One fetched URL within a crawl job (raw_documents). */
-export interface RawDocument {
-  id: string;
-  crawlJobId: string;
-  sourceId: string;
-  url: string;
-  contentType: string | null;
-  /** Object-storage key of the stored payload; null when status is error/skipped. */
-  storageKey: string | null;
-  /** sha256 hex of the payload — enables change detection/dedup in Phase 3. */
-  checksum: string | null;
-  status: RawDocumentStatus;
-  httpStatus: number | null;
-  responseBytes: number | null;
-  errorMessage: string | null;
-  fetchedAt: string;
-  createdAt: string;
-}
-
-// TODO(Phase 3): extraction hand-off contracts (raw_document -> staging JSON)
-// are defined here when the AI transform layer is built.

@@ -53,7 +53,9 @@ describe("parseNameParts", () => {
 
   it("drops the [edition] prefix and reads a multi-word set type", () => {
     expect(
-      parseNameParts("[NUNMEONGI EDITION] ROUND LAB 1025 Dokdo Toner 300ml Double Pack (+Soft Keyring)"),
+      parseNameParts(
+        "[NUNMEONGI EDITION] ROUND LAB 1025 Dokdo Toner 300ml Double Pack (+Soft Keyring)",
+      ),
     ).toEqual({
       productName: "ROUND LAB 1025 Dokdo Toner",
       sizeValue: "300.00",
@@ -149,7 +151,10 @@ const ENVELOPE = {
         sellingFastYn: "Y",
         releaseYmd: "20260324",
         imagePath: "prdtImg/1847/img.jpg",
-        optionList: [{ rprstYn: "Y", buyStockQty: 973 }, { rprstYn: "N", buyStockQty: 10 }],
+        optionList: [
+          { rprstYn: "Y", buyStockQty: 973 },
+          { rprstYn: "N", buyStockQty: 10 },
+        ],
         thumbnailList: [{ imagePath: "a.jpg" }],
         promotion: { promoLabel: "SALE" },
         mbrGradeCpnMap: { "40": { cpnDscntAmt: 5 } },
@@ -174,13 +179,12 @@ const ENVELOPE = {
 };
 
 describe("mapEnvelopeToCleanProduct", () => {
-  const row = mapEnvelopeToCleanProduct(ENVELOPE, "raw-doc-1")!;
+  const row = mapEnvelopeToCleanProduct(ENVELOPE)!;
 
   it("produces a clean, typed row (no raw or half-parsed values)", () => {
     expect(row).not.toBeNull();
     expect(row.productId).toBe("GA260339051");
     expect(row.barcode).toBe("8809700321918");
-    expect(row.rawDocumentId).toBe("raw-doc-1");
     // text collapsed + trimmed
     expect(row.nameEn).toBe("celimax Retinal Shot Booster");
     expect(row.brandName).toBe("celimax");
@@ -225,6 +229,6 @@ describe("mapEnvelopeToCleanProduct", () => {
 
   it("returns null when detail-data is missing (delisted / failed fetch)", () => {
     const failed = { product_id: "GA0", endpoints: { "detail-data": null } };
-    expect(mapEnvelopeToCleanProduct(failed, null)).toBeNull();
+    expect(mapEnvelopeToCleanProduct(failed)).toBeNull();
   });
 });

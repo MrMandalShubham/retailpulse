@@ -1,16 +1,19 @@
 /**
- * Clean DIP schema (post middle-chain retirement). The engine is now
- * discover → ingest → clean-load, so only these tables remain:
- *   - raw/ingestion layer: sources, crawl_jobs, raw_documents
+ * Clean DIP schema (storage-free 2-step engine). The engine is now
+ * discover → ingest+clean, so only these tables remain:
+ *   - ingestion-control layer: sources, crawl_jobs (fetch-run log)
  *   - Phase 0 discovery map: discovery_runs, discovered_product_pages
  *   - per-platform clean store (the end product): oliveyoung_global_products
+ *     + oliveyoung_global_product_snapshots
  *
- * The normalized core 8 + staging/AI/promotion/facts/enrichment tables were
- * retired with the middle chain (restore via git tag pre-retire-middle-chain).
+ * The raw layer (raw_documents + object storage) was dropped once ingestion
+ * began writing the clean store directly. The normalized core 8 +
+ * staging/AI/promotion/facts/enrichment tables were retired with the middle
+ * chain (restore via git tag pre-retire-middle-chain).
  */
 
-// Raw ELT layer
-export { sources, crawlJobs, rawDocuments } from "./ingestion.js";
+// Ingestion-control layer
+export { sources, crawlJobs } from "./ingestion.js";
 
 // Product-discovery layer (Phase 0)
 export { discoveryRuns, discoveredProductPages } from "./discovery.js";

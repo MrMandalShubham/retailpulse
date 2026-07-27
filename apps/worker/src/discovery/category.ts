@@ -89,7 +89,13 @@ export async function discoverViaCategoryApi(
   for (const ctgrNo of cats) {
     for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
       if (pages.size >= maxUrls) break;
-      const body = { ...DEFAULT_BODY, ...(config.requestTemplate ?? {}), ctgrNo, pageNum, rowsPerPage: String(rows) };
+      const body = {
+        ...DEFAULT_BODY,
+        ...(config.requestTemplate ?? {}),
+        ctgrNo,
+        pageNum,
+        rowsPerPage: String(rows),
+      };
       const json = (await deps.postJson(apiUrl, body)) as any;
       const hits: any[] | undefined = json?.hits?.hit;
       if (!Array.isArray(hits) || hits.length === 0) break;
