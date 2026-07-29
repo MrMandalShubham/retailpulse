@@ -44,7 +44,7 @@ export const oliveyoungGlobalProducts = pgTable(
     nameEn: text("name_en"), // raw source name (kept verbatim)
     nameKr: text("name_kr"),
     // Parsed from name_en (heuristic; name_en stays the fallback):
-    productName: text("product_name"), // brand + core name (size/set/gift stripped)
+    productName: text("product_name"), // core name (brand + size/set/gift stripped)
     sizeValue: numeric("size_value", { precision: 10, scale: 2 }),
     sizeUnit: text("size_unit"), // ml / g / ea …
     setType: text("set_type"), // Set / Double Set / Duo / Pack … (null if not a set)

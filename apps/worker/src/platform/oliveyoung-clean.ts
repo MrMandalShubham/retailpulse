@@ -236,8 +236,9 @@ const SET_RE =
 
 /**
  * Split a raw Olive Young product name into parts (heuristic; name_en stays the
- * fallback). Keeps the brand IN product_name; strips the [edition] prefix, the
- * size token(s), a trailing set descriptor, and the (+gift) parenthetical.
+ * fallback). Strips the [edition] prefix, the size token(s), a trailing set
+ * descriptor, and the (+gift) parenthetical. The brand is still present here —
+ * mapEnvelopeToCleanProduct removes it via stripBrandPrefix for the column.
  *   "celimax Retinal Shot 15ml Set (+3ml)"
  *     -> productName "celimax Retinal Shot", size 15 ml, setType "Set", composition "+3ml"
  */
@@ -296,6 +297,32 @@ export function parseNameParts(nameEnRaw: string | null): NameParts {
       .replace(/[\s:,\-–+]+$/, "") // trailing junk incl. an orphan '+'
       .trim() || null;
   return { productName, sizeValue, sizeUnit, setType, composition };
+}
+
+/**
+ * Strip a leading brand from the parsed product name so product_name holds the
+ * CORE name only — the brand already lives in brand_name (no duplication).
+ * Case-insensitive and boundary-aware: only strips when the name starts with the
+ * exact brand followed by a separator/space, so "Something" isn't cut by a brand
+ * "Some", and a brand whose spelling/spacing differs from the name (e.g. name
+ * "Dr. G …" vs brand "Dr.G") is left in place rather than mis-stripped. If the
+ * name doesn't start with the brand, or stripping would empty it, it's unchanged.
+ *   ("celimax Retinal Shot Booster", "celimax") -> "Retinal Shot Booster"
+ */
+export function stripBrandPrefix(name: string | null, brand: string | null): string | null {
+  if (!name) return name;
+  const n = name.trim();
+  const b = (brand ?? "").trim();
+  if (!b || n.length <= b.length) return n || null;
+  if (n.slice(0, b.length).toLowerCase() !== b.toLowerCase()) return n;
+  // The char after the brand must be a boundary — else the brand is just a
+  // prefix of a longer word and must NOT be stripped.
+  if (/[a-z0-9]/i.test(n.charAt(b.length))) return n;
+  const rest = n
+    .slice(b.length)
+    .replace(/^[\s.,:;|/\\–—-]+/, "")
+    .trim();
+  return rest.length ? rest : n;
 }
 
 /**
@@ -386,6 +413,7 @@ export function mapEnvelopeToCleanProduct(env: any): CleanProduct | null {
   const pathEn = clean(d.allPathCtgrNameEn);
   const [l1, l2, l3] = splitPath(pathEn);
   const nameEn = clean(d.prdtNameEn);
+  const brandName = clean(d.brandName ?? d.brandNameEn);
   const parts = parseNameParts(nameEn);
   const ingredients = cleanProse(info.ftrdIngrdText);
 
@@ -396,13 +424,14 @@ export function mapEnvelopeToCleanProduct(env: any): CleanProduct | null {
     fetchedAt: env?.fetched_at ? new Date(env.fetched_at) : null,
     nameEn,
     nameKr: clean(d.korPrdtName ?? d.prdtName),
-    productName: parts.productName,
+    // Core name only — the brand lives in brand_name, not duplicated here.
+    productName: stripBrandPrefix(parts.productName, brandName),
     sizeValue: parts.sizeValue,
     sizeUnit: parts.sizeUnit,
     setType: parts.setType,
     composition: parts.composition,
     brandNo: clean(d.brandNo),
-    brandName: clean(d.brandName ?? d.brandNameEn),
+    brandName,
     brandNameKr: clean(d.korBrandName),
     categoryNo: clean(d.ctgrNo),
     categoryPathEn: pathEn,

@@ -3,7 +3,33 @@ import {
   extractKeyIngredients,
   mapEnvelopeToCleanProduct,
   parseNameParts,
+  stripBrandPrefix,
 } from "../src/platform/oliveyoung-clean.js";
+
+describe("stripBrandPrefix", () => {
+  it("removes a leading brand (case-insensitive, boundary-aware)", () => {
+    expect(stripBrandPrefix("celimax Retinal Shot Booster", "celimax")).toBe(
+      "Retinal Shot Booster",
+    );
+    expect(stripBrandPrefix("SKIN1004 Madagascar Centella Ampoule", "SKIN1004")).toBe(
+      "Madagascar Centella Ampoule",
+    );
+  });
+
+  it("leaves the name unchanged when the brand isn't a leading whole token", () => {
+    // brand is only a prefix of a longer word → not stripped
+    expect(stripBrandPrefix("Someone Special Cream", "Some")).toBe("Someone Special Cream");
+    // brand spelling differs from the name (space vs no space) → left in place
+    expect(stripBrandPrefix("Dr. G pH Cleansing Gel Foam", "Dr.G")).toBe(
+      "Dr. G pH Cleansing Gel Foam",
+    );
+  });
+
+  it("keeps the original if stripping would empty it, and passes null through", () => {
+    expect(stripBrandPrefix("celimax", "celimax")).toBe("celimax");
+    expect(stripBrandPrefix(null, "celimax")).toBeNull();
+  });
+});
 
 describe("extractKeyIngredients", () => {
   it("pulls hero actives from marketing prose (dictionary-bounded)", () => {
@@ -188,6 +214,8 @@ describe("mapEnvelopeToCleanProduct", () => {
     // text collapsed + trimmed
     expect(row.nameEn).toBe("celimax Retinal Shot Booster");
     expect(row.brandName).toBe("celimax");
+    // product_name is the CORE name — brand stripped (lives in brand_name).
+    expect(row.productName).toBe("Retinal Shot Booster");
     // entities decoded in the category path + split into levels
     expect(row.categoryPathEn).toBe("OliveYoungGlobal > Skincare > Moisturizers > Essence & Serum");
     expect(row.categoryL1).toBe("Skincare");
