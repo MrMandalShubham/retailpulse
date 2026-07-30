@@ -219,6 +219,79 @@ const STEPS: { name: string; sql: string }[] = [
         neutral_pct = EXCLUDED.neutral_pct,
         first_mention_date = EXCLUDED.first_mention_date`,
   },
+  {
+    // review-volume proxy: units_sold = review_count as the demand weight;
+    // shares/rank computed within (category, subcategory) for the current
+    // quarter, Global market. Revenue side left null (no sales in the source).
+    name: "product_category_share",
+    sql: `
+      WITH base AS (
+        SELECT p.product_id,
+               COALESCE(p.product_name, p.name_en) AS product_name,
+               p.brand_name,
+               p.category_l1 AS category,
+               p.category_l2 AS subcategory,
+               COALESCE(p.review_count, 0)::bigint AS units
+        FROM oliveyoung_global_products p
+        WHERE p.category_l1 IS NOT NULL AND p.category_l2 IS NOT NULL
+      ),
+      sub_tot AS (
+        SELECT category, subcategory, SUM(units) AS sub_units
+        FROM base GROUP BY category, subcategory
+      ),
+      cat_tot AS (
+        SELECT category, SUM(units) AS cat_units FROM base GROUP BY category
+      ),
+      ranked AS (
+        SELECT b.*, st.sub_units, ct.cat_units,
+               DENSE_RANK() OVER (
+                 PARTITION BY b.category, b.subcategory ORDER BY b.units DESC
+               )::int AS rnk
+        FROM base b
+        JOIN sub_tot st ON st.category = b.category AND st.subcategory = b.subcategory
+        JOIN cat_tot ct ON ct.category = b.category
+      )
+      INSERT INTO product_category_share (
+        product_id, product_name, product_slug, brand_name, brand_slug, is_tracked,
+        market, market_code, category, subcategory,
+        period_type, period_label, period_start, period_end,
+        units_sold, total_subcategory_units, total_category_units,
+        units_subcategory_share_pct, units_category_share_pct,
+        rank_in_subcategory, rank_change, change_pct
+      )
+      SELECT
+        r.product_id,
+        r.product_name,
+        trim(both '-' from lower(regexp_replace(
+          trim(COALESCE(r.brand_name, '') || ' ' || r.product_name), '[^a-z0-9]+', '-', 'gi'))),
+        r.brand_name,
+        trim(both '-' from lower(regexp_replace(COALESCE(r.brand_name, ''), '[^a-z0-9]+', '-', 'gi'))),
+        false,
+        'Global (Cross-border)', 'XG',
+        r.category, r.subcategory,
+        'quarterly',
+        to_char(now(), 'YYYY') || '-Q' || to_char(now(), 'Q'),
+        date_trunc('quarter', now())::date,
+        (date_trunc('quarter', now()) + interval '3 months' - interval '1 day')::date,
+        r.units, r.sub_units, r.cat_units,
+        CASE WHEN r.sub_units > 0 THEN round(100.0 * r.units / r.sub_units, 3) END,
+        CASE WHEN r.cat_units > 0 THEN round(100.0 * r.units / r.cat_units, 3) END,
+        r.rnk, 0, 0
+      FROM ranked r
+      ON CONFLICT (product_id, period_label, market_code) DO UPDATE SET
+        product_name = EXCLUDED.product_name,
+        product_slug = EXCLUDED.product_slug,
+        brand_name = EXCLUDED.brand_name,
+        brand_slug = EXCLUDED.brand_slug,
+        category = EXCLUDED.category,
+        subcategory = EXCLUDED.subcategory,
+        units_sold = EXCLUDED.units_sold,
+        total_subcategory_units = EXCLUDED.total_subcategory_units,
+        total_category_units = EXCLUDED.total_category_units,
+        units_subcategory_share_pct = EXCLUDED.units_subcategory_share_pct,
+        units_category_share_pct = EXCLUDED.units_category_share_pct,
+        rank_in_subcategory = EXCLUDED.rank_in_subcategory`,
+  },
 ];
 
 export async function runDistribute(

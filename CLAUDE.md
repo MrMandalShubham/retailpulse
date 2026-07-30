@@ -88,9 +88,14 @@ of `oliveyoung_global_products` (+ snapshots), rebuilt by `pnpm distribute`
   `key_ingredients` (denormalized array by design — no separate names table).
 - `voice_pulse_sentiment` — brand × month × market rating-derived proxy
   (positive/negative/neutral from the star breakdown; NOT text NLP).
+- `product_category_share` — per-product category/subcategory share for the
+  current quarter. The source has NO sales, so `units_sold` + the `*_units_*`
+  columns hold a **review-volume proxy** (review_count as the demand weight);
+  the revenue side (`revenue`, `*_revenue`, `subcategory/category_share_pct`)
+  stays null. `product_id` is the idempotency anchor (not a dashboard column).
 
 Nothing here is a source of truth — it can be dropped and re-derived. Known gap:
-`product_sales_history` isn't built (no units/revenue in the source).
+`product_sales_history` isn't built (needs real units/revenue the source lacks).
 
 ## Codebase layout
 

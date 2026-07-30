@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   date,
   integer,
@@ -209,5 +210,54 @@ export const voicePulseSentiment = pgTable(
       t.platform,
       t.periodMonth,
     ),
+  ],
+);
+
+/**
+ * Category/subcategory share per product per period. The source has NO sales,
+ * so `units_sold` and the *_units_* columns hold a REVIEW-VOLUME proxy (a
+ * product's review_count as its demand weight) — popularity, not units. The
+ * revenue side (`revenue`, `*_revenue`, `subcategory_share_pct`,
+ * `category_share_pct`) stays null; it needs a real sales/POS source.
+ * `product_id` is our idempotency anchor (not read by the dashboard).
+ */
+export const productCategoryShare = pgTable(
+  "product_category_share",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: text("product_id").notNull(), // our key (not a dashboard column)
+    productName: text("product_name"),
+    productSlug: text("product_slug"),
+    brandName: text("brand_name"),
+    brandSlug: text("brand_slug"),
+    isTracked: boolean("is_tracked").default(false),
+    market: text("market"),
+    marketCode: text("market_code"),
+    category: text("category"),
+    subcategory: text("subcategory"),
+    periodType: text("period_type"),
+    periodLabel: text("period_label"),
+    periodStart: date("period_start"),
+    periodEnd: date("period_end"),
+    // --- units family = review-volume proxy ---
+    unitsSold: bigint("units_sold", { mode: "number" }),
+    totalSubcategoryUnits: bigint("total_subcategory_units", { mode: "number" }),
+    totalCategoryUnits: bigint("total_category_units", { mode: "number" }),
+    unitsSubcategorySharePct: numeric("units_subcategory_share_pct", { precision: 6, scale: 3 }),
+    unitsCategorySharePct: numeric("units_category_share_pct", { precision: 6, scale: 3 }),
+    // --- revenue family = gap (no sales) ---
+    revenue: numeric("revenue", { precision: 20, scale: 2 }),
+    totalSubcategoryRevenue: numeric("total_subcategory_revenue", { precision: 20, scale: 2 }),
+    totalCategoryRevenue: numeric("total_category_revenue", { precision: 20, scale: 2 }),
+    subcategorySharePct: numeric("subcategory_share_pct", { precision: 6, scale: 3 }),
+    categorySharePct: numeric("category_share_pct", { precision: 6, scale: 3 }),
+    // --- rank ---
+    rankInSubcategory: integer("rank_in_subcategory"),
+    rankChange: integer("rank_change"),
+    changePct: numeric("change_pct", { precision: 8, scale: 2 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("pcs_product_period_market_unique").on(t.productId, t.periodLabel, t.marketCode),
   ],
 );

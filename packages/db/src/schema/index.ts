@@ -34,4 +34,5 @@ export {
   productsMaster,
   productIngredients,
   voicePulseSentiment,
+  productCategoryShare,
 } from "./serving.js";

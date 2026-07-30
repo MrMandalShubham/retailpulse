@@ -1,0 +1,33 @@
+CREATE TABLE "product_category_share" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"product_id" text NOT NULL,
+	"product_name" text,
+	"product_slug" text,
+	"brand_name" text,
+	"brand_slug" text,
+	"is_tracked" boolean DEFAULT false,
+	"market" text,
+	"market_code" text,
+	"category" text,
+	"subcategory" text,
+	"period_type" text,
+	"period_label" text,
+	"period_start" date,
+	"period_end" date,
+	"units_sold" bigint,
+	"total_subcategory_units" bigint,
+	"total_category_units" bigint,
+	"units_subcategory_share_pct" numeric(6, 3),
+	"units_category_share_pct" numeric(6, 3),
+	"revenue" numeric(20, 2),
+	"total_subcategory_revenue" numeric(20, 2),
+	"total_category_revenue" numeric(20, 2),
+	"subcategory_share_pct" numeric(6, 3),
+	"category_share_pct" numeric(6, 3),
+	"rank_in_subcategory" integer,
+	"rank_change" integer,
+	"change_pct" numeric(8, 2),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX "pcs_product_period_market_unique" ON "product_category_share" USING btree ("product_id","period_label","market_code");
