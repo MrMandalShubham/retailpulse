@@ -23,3 +23,15 @@ export {
   oliveyoungGlobalProducts,
   oliveyoungGlobalProductSnapshots,
 } from "./platform-oliveyoung.js";
+
+// Dashboard serving layer — derived tables projected from the clean store by
+// `pnpm distribute` (the dashboard reads these).
+export {
+  brands,
+  categories,
+  markets,
+  retailProducts,
+  productsMaster,
+  productIngredients,
+  voicePulseSentiment,
+} from "./serving.js";

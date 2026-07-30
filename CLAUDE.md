@@ -67,7 +67,30 @@ Defined in `packages/db/src/schema/`, migrated from `packages/db/migrations/`.
 - `pnpm ingest:api oliveyoung-global [n]` — fetch + clean n pending products
   straight into the clean store + snapshots (idempotent; reads
   `discovered_product_pages` pending directly).
+- `pnpm distribute` — rebuild the dashboard serving tables from the clean store
+  (see below). Idempotent; safe to run after every ingest.
 - `pnpm db:seed` — bootstrap the `oliveyoung-global` source + discovery_config.
+
+## Dashboard serving layer (derived)
+
+The Retail dashboard reads a set of **derived** tables that are pure projections
+of `oliveyoung_global_products` (+ snapshots), rebuilt by `pnpm distribute`
+(migration `0018`, schema `packages/db/src/schema/serving.ts`):
+
+- `brands`, `categories`, `markets` — dimensions (distinct brands/categories;
+  markets seeded with one `XG` "Global (Cross-border)" row, since Olive Young
+  Global is a single cross-border storefront).
+- `retail_products` — flat 1:1 mirror of the clean store (leaderboard).
+- `products_master` — normalized canonical hub (FKs to brands/categories);
+  enrichment columns the source lacks (skin types, SPF, texture, price segment,
+  multi-currency benchmarks) stay null.
+- `product_ingredients` — `(product_id, product_name, ingredients text[])` from
+  `key_ingredients` (denormalized array by design — no separate names table).
+- `voice_pulse_sentiment` — brand × month × market rating-derived proxy
+  (positive/negative/neutral from the star breakdown; NOT text NLP).
+
+Nothing here is a source of truth — it can be dropped and re-derived. Known gap:
+`product_sales_history` isn't built (no units/revenue in the source).
 
 ## Codebase layout
 

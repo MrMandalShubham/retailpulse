@@ -8,6 +8,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "ingest-api": "tsx src/ingest-api.ts",
+    "distribute": "tsx src/distribute.ts",
     "discover": "tsx src/discover.ts"
   },
   "dependencies": {

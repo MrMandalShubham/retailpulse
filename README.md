@@ -112,6 +112,7 @@ Verify: `GET http://localhost:3000/health` (liveness) and
 | `pnpm dev:worker`            | Run the idle worker skeleton (boot + validate + idle)                                                       |
 | `pnpm discover:run`          | Map the source catalog into `discovered_product_pages`                                                      |
 | `pnpm ingest:api [slug] [n]` | Fetch + clean `n` pending products straight into the clean store + snapshots (default: oliveyoung-global 3) |
+| `pnpm distribute`            | Rebuild the dashboard serving tables (projections of the clean store); idempotent                           |
 | `pnpm db:seed`               | Idempotent seed of the approved ingestion source                                                            |
 | `pnpm lint`                  | ESLint over the whole repo                                                                                  |
 | `pnpm format`                | Prettier write                                                                                              |
