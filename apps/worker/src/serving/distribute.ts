@@ -322,6 +322,59 @@ const STEPS: { name: string; sql: string }[] = [
         units_sold = EXCLUDED.units_sold,
         last_updated = now()`,
   },
+  {
+    // brand share within a category (current quarter, Global/XG). units_sold =
+    // brand's summed review_count; units_share_pct = brand ÷ category review
+    // volume. Revenue + market_share_pct (revenue share) left null.
+    name: "brand_market_share",
+    sql: `
+      WITH brand_cat AS (
+        -- group by the computed slug so same-slug brands can't collide on the
+        -- (brand_slug, category, …) conflict key within one statement.
+        SELECT
+          trim(both '-' from lower(regexp_replace(brand_name, '[^a-z0-9]+', '-', 'gi'))) AS brand_slug,
+          max(brand_name) AS brand_name,
+          category_l1 AS category,
+          SUM(COALESCE(review_count, 0))::bigint AS units
+        FROM oliveyoung_global_products
+        WHERE brand_name IS NOT NULL AND category_l1 IS NOT NULL
+        GROUP BY 1, category_l1
+      ),
+      cat_tot AS (
+        SELECT category, SUM(units) AS cat_units FROM brand_cat GROUP BY category
+      ),
+      ranked AS (
+        SELECT bc.*, ct.cat_units,
+               DENSE_RANK() OVER (PARTITION BY bc.category ORDER BY bc.units DESC)::int AS rnk
+        FROM brand_cat bc JOIN cat_tot ct ON ct.category = bc.category
+      )
+      INSERT INTO brand_market_share (
+        brand_name, brand_slug, is_tracked, market, market_code, category,
+        period_type, period_label, period_start, period_end,
+        units_sold, currency, total_category_units,
+        units_share_pct, rank_in_category, rank_change, change_pct
+      )
+      SELECT
+        r.brand_name,
+        r.brand_slug,
+        false,
+        'Global (Cross-border)', 'XG',
+        r.category,
+        'quarterly',
+        to_char(now(), 'YYYY') || '-Q' || to_char(now(), 'Q'),
+        date_trunc('quarter', now())::date,
+        (date_trunc('quarter', now()) + interval '3 months' - interval '1 day')::date,
+        r.units, 'USD', r.cat_units,
+        CASE WHEN r.cat_units > 0 THEN round(100.0 * r.units / r.cat_units, 3) END,
+        r.rnk, 0, 0
+      FROM ranked r
+      ON CONFLICT (brand_slug, category, period_label, market_code) DO UPDATE SET
+        brand_name = EXCLUDED.brand_name,
+        units_sold = EXCLUDED.units_sold,
+        total_category_units = EXCLUDED.total_category_units,
+        units_share_pct = EXCLUDED.units_share_pct,
+        rank_in_category = EXCLUDED.rank_in_category`,
+  },
 ];
 
 export async function runDistribute(

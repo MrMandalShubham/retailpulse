@@ -290,3 +290,45 @@ export const productSalesHistory = pgTable(
   },
   (t) => [uniqueIndex("psh_product_period_unique").on(t.productId, t.periodLabel)],
 );
+
+/**
+ * Brand share within a category per market per quarter. Review-volume proxy:
+ * `units_sold` = the brand's summed review_count in that category; `units_share_pct`
+ * = brand review-volume ÷ category review-volume. The revenue side (`revenue`,
+ * `total_category_revenue`, `market_share_pct`) stays null — no sales in the source.
+ */
+export const brandMarketShare = pgTable(
+  "brand_market_share",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandName: text("brand_name"),
+    brandSlug: text("brand_slug"),
+    isTracked: boolean("is_tracked").default(false),
+    market: text("market"),
+    marketCode: text("market_code"),
+    category: text("category"),
+    periodType: text("period_type"),
+    periodLabel: text("period_label"),
+    periodStart: date("period_start"),
+    periodEnd: date("period_end"),
+    unitsSold: bigint("units_sold", { mode: "number" }), // review-volume proxy
+    revenue: numeric("revenue", { precision: 20, scale: 2 }), // gap (no sales)
+    currency: text("currency"),
+    totalCategoryUnits: bigint("total_category_units", { mode: "number" }),
+    totalCategoryRevenue: numeric("total_category_revenue", { precision: 20, scale: 2 }), // gap
+    marketSharePct: numeric("market_share_pct", { precision: 6, scale: 3 }), // revenue share → gap
+    unitsSharePct: numeric("units_share_pct", { precision: 6, scale: 3 }), // review-volume proxy
+    rankInCategory: integer("rank_in_category"),
+    rankChange: integer("rank_change"),
+    changePct: numeric("change_pct", { precision: 8, scale: 2 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("bms_brand_category_period_market_unique").on(
+      t.brandSlug,
+      t.category,
+      t.periodLabel,
+      t.marketCode,
+    ),
+  ],
+);
