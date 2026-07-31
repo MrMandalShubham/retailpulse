@@ -37,4 +37,5 @@ export {
   productCategoryShare,
   productSalesHistory,
   brandMarketShare,
+  retailPulseShelfShare,
 } from "./serving.js";

@@ -375,6 +375,42 @@ const STEPS: { name: string; sql: string }[] = [
         units_share_pct = EXCLUDED.units_share_pct,
         rank_in_category = EXCLUDED.rank_in_category`,
   },
+  {
+    // weekly shelf presence. oos_pct (stock) + promo_pct (discount) are REAL;
+    // shelf_share_pct = review share within subcategory (proxy); facings null.
+    // FKs resolved: product_id ← products_master.id (via source_url), market ← XG.
+    name: "retail_pulse_shelf_share",
+    sql: `
+      WITH base AS (
+        SELECT p.source_url, p.category_l2 AS subcat,
+               COALESCE(p.review_count, 0)::bigint AS units,
+               p.stock_qty, p.discount_rate
+        FROM oliveyoung_global_products p
+        WHERE p.source_url IS NOT NULL AND p.source_url <> ''
+      ),
+      sub_tot AS (
+        SELECT subcat, SUM(units) AS su FROM base WHERE subcat IS NOT NULL GROUP BY subcat
+      )
+      INSERT INTO retail_pulse_shelf_share (
+        product_id, market_id, retailer, shelf_share_pct, oos_pct, promo_pct, week_ending, source
+      )
+      SELECT
+        pm.id, m.id, 'Olive Young',
+        CASE WHEN st.su > 0 THEN round(100.0 * b.units / st.su, 3) END,
+        CASE WHEN COALESCE(b.stock_qty, 0) <= 0 THEN 100.0 ELSE 0.0 END,
+        COALESCE(b.discount_rate, 0),
+        (date_trunc('week', now()) + interval '6 days')::date,
+        'API'
+      FROM base b
+      JOIN products_master pm ON pm.source_url = b.source_url
+      LEFT JOIN sub_tot st ON st.subcat = b.subcat
+      CROSS JOIN (SELECT id FROM markets WHERE code = 'XG' LIMIT 1) m
+      ON CONFLICT (product_id, market_id, week_ending) DO UPDATE SET
+        shelf_share_pct = EXCLUDED.shelf_share_pct,
+        oos_pct = EXCLUDED.oos_pct,
+        promo_pct = EXCLUDED.promo_pct,
+        retailer = EXCLUDED.retailer`,
+  },
 ];
 
 export async function runDistribute(

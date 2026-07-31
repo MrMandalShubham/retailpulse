@@ -332,3 +332,29 @@ export const brandMarketShare = pgTable(
     ),
   ],
 );
+
+/**
+ * Weekly per-product shelf presence. `oos_pct` (from stock_qty) and `promo_pct`
+ * (from discount_rate) are REAL. `shelf_share_pct` is a review-volume proxy (the
+ * product's review share within its subcategory); `facings` stays null — no
+ * planogram/PDF source. FKs to products_master + markets (like the dashboard).
+ */
+export const retailPulseShelfShare = pgTable(
+  "retail_pulse_shelf_share",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id").references(() => productsMaster.id, { onDelete: "cascade" }),
+    marketId: uuid("market_id").references(() => markets.id, { onDelete: "set null" }),
+    retailer: text("retailer"),
+    shelfSharePct: numeric("shelf_share_pct", { precision: 6, scale: 3 }), // review-volume proxy
+    facings: integer("facings"), // gap (no planogram source)
+    oosPct: numeric("oos_pct", { precision: 6, scale: 3 }), // real: from stock_qty
+    promoPct: numeric("promo_pct", { precision: 6, scale: 3 }), // real: from discount_rate
+    weekEnding: date("week_ending").notNull(),
+    source: text("source"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("rpss_product_market_week_unique").on(t.productId, t.marketId, t.weekEnding),
+  ],
+);
