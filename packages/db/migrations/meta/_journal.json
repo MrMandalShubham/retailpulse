@@ -141,6 +141,13 @@
       "when": 1785384364790,
       "tag": "0019_product_category_share",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785460942259,
+      "tag": "0020_product_sales_history",
+      "breakpoints": true
     }
   ]
 }

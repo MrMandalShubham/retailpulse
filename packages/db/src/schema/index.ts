@@ -35,4 +35,5 @@ export {
   productIngredients,
   voicePulseSentiment,
   productCategoryShare,
+  productSalesHistory,
 } from "./serving.js";

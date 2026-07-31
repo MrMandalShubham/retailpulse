@@ -261,3 +261,32 @@ export const productCategoryShare = pgTable(
     uniqueIndex("pcs_product_period_market_unique").on(t.productId, t.periodLabel, t.marketCode),
   ],
 );
+
+/**
+ * Per-product monthly sales history. The source has NO sales, so `units_sold`
+ * holds a REVIEW-VOLUME proxy (review_count as the demand weight) and `revenue`
+ * stays null. One row per product per month (Global/XG, USD). `product_id` is
+ * our idempotency anchor (not a dashboard column). True month-over-month units
+ * (review deltas) become possible once snapshot history spans months.
+ */
+export const productSalesHistory = pgTable(
+  "product_sales_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: text("product_id").notNull(), // our key (not a dashboard column)
+    productSlug: text("product_slug"),
+    sku: text("sku"),
+    retailer: text("retailer"),
+    market: text("market"),
+    currency: text("currency"),
+    periodType: text("period_type"),
+    periodLabel: text("period_label"),
+    periodStart: date("period_start"),
+    periodEnd: date("period_end"),
+    unitsSold: bigint("units_sold", { mode: "number" }), // review-volume proxy
+    revenue: numeric("revenue", { precision: 20, scale: 2 }), // gap (no sales)
+    lastUpdated: timestamp("last_updated", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("psh_product_period_unique").on(t.productId, t.periodLabel)],
+);

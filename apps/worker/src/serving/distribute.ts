@@ -292,6 +292,36 @@ const STEPS: { name: string; sql: string }[] = [
         units_category_share_pct = EXCLUDED.units_category_share_pct,
         rank_in_subcategory = EXCLUDED.rank_in_subcategory`,
   },
+  {
+    // monthly per-product row for the current month; units_sold = review_count
+    // proxy, revenue null (no sales in the source). Global/XG, USD.
+    name: "product_sales_history",
+    sql: `
+      INSERT INTO product_sales_history (
+        product_id, product_slug, retailer, market, currency,
+        period_type, period_label, period_start, period_end,
+        units_sold, last_updated
+      )
+      SELECT
+        p.product_id,
+        trim(both '-' from lower(regexp_replace(
+          trim(COALESCE(p.brand_name, '') || ' ' || COALESCE(p.product_name, p.name_en, p.product_id)),
+          '[^a-z0-9]+', '-', 'gi'))),
+        'Olive Young',
+        'Global (Cross-border)',
+        'USD',
+        'monthly',
+        to_char(now(), 'YYYY-MM'),
+        date_trunc('month', now())::date,
+        (date_trunc('month', now()) + interval '1 month' - interval '1 day')::date,
+        COALESCE(p.review_count, 0)::bigint,
+        now()
+      FROM oliveyoung_global_products p
+      ON CONFLICT (product_id, period_label) DO UPDATE SET
+        product_slug = EXCLUDED.product_slug,
+        units_sold = EXCLUDED.units_sold,
+        last_updated = now()`,
+  },
 ];
 
 export async function runDistribute(
