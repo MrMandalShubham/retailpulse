@@ -60,7 +60,7 @@ const STEPS: { name: string; sql: string }[] = [
     name: "markets",
     sql: `
       INSERT INTO markets (name, code, region, flag, regulatory_authority)
-      VALUES ('Global (Cross-border)', 'XG', 'Global', '🌐', NULL)
+      VALUES ('Korea (Global)', 'XG', 'Asia', '🇰🇷', NULL)
       ON CONFLICT (code) DO NOTHING`,
   },
   {
@@ -267,7 +267,7 @@ const STEPS: { name: string; sql: string }[] = [
         r.brand_name,
         trim(both '-' from lower(regexp_replace(COALESCE(r.brand_name, ''), '[^a-z0-9]+', '-', 'gi'))),
         false,
-        'Global (Cross-border)', 'XG',
+        'Korea (Global)', 'XG',
         r.category, r.subcategory,
         'quarterly',
         to_char(now(), 'YYYY') || '-Q' || to_char(now(), 'Q'),
@@ -308,7 +308,7 @@ const STEPS: { name: string; sql: string }[] = [
           trim(COALESCE(p.brand_name, '') || ' ' || COALESCE(p.product_name, p.name_en, p.product_id)),
           '[^a-z0-9]+', '-', 'gi'))),
         'Olive Young',
-        'Global (Cross-border)',
+        'Korea (Global)',
         'USD',
         'monthly',
         to_char(now(), 'YYYY-MM'),
@@ -358,7 +358,7 @@ const STEPS: { name: string; sql: string }[] = [
         r.brand_name,
         r.brand_slug,
         false,
-        'Global (Cross-border)', 'XG',
+        'Korea (Global)', 'XG',
         r.category,
         'quarterly',
         to_char(now(), 'YYYY') || '-Q' || to_char(now(), 'Q'),

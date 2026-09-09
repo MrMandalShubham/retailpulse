@@ -78,8 +78,9 @@ of `oliveyoung_global_products` (+ snapshots), rebuilt by `pnpm distribute`
 (migration `0018`, schema `packages/db/src/schema/serving.ts`):
 
 - `brands`, `categories`, `markets` — dimensions (distinct brands/categories;
-  markets seeded with one `XG` "Global (Cross-border)" row, since Olive Young
-  Global is a single cross-border storefront).
+  markets seeded with one row for our data: code `XG`, display name
+  "Korea (Global)" 🇰🇷, since Olive Young Global is Korea's single cross-border
+  storefront. The internal code stays `XG` — `KR` is a separate domestic row).
 - `retail_products` — flat 1:1 mirror of the clean store (leaderboard).
 - `products_master` — normalized canonical hub (FKs to brands/categories);
   enrichment columns the source lacks (skin types, SPF, texture, price segment,
