@@ -88,6 +88,8 @@ export const retailProducts = pgTable("retail_products", {
   salePrice: numeric("sale_price", { precision: 12, scale: 2 }),
   discountRate: numeric("discount_rate", { precision: 5, scale: 2 }),
   currency: text("currency"),
+  market: text("market"), // display market/country (e.g. "Korea (Global)")
+  marketCode: text("market_code"), // market code (e.g. "XG")
   minCouponPrice: numeric("min_coupon_price", { precision: 12, scale: 2 }),
   stockQty: integer("stock_qty"),
   sellStatusCode: text("sell_status_code"),
@@ -141,6 +143,8 @@ export const productsMaster = pgTable(
     discontinuationDate: date("discontinuation_date"),
     priceBenchmarkUsd: numeric("price_benchmark_usd", { precision: 12, scale: 2 }),
     marketStatus: text("market_status"),
+    market: text("market"), // display market/country (e.g. "Korea (Global)")
+    marketCode: text("market_code"), // market code (e.g. "XG")
     targetAgeGroup: text("target_age_group"),
     primaryImageUrl: text("primary_image_url"),
     dataQualityScore: integer("data_quality_score"),

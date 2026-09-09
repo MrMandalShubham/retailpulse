@@ -45,12 +45,19 @@ const MIRROR_COLS = [
   "why_we_love_it",
 ];
 
+/** The market our Olive Young Global products belong to (Korea's cross-border store).
+ *  Per-source constant — a future platform sets its own market. */
+const MARKET_NAME = "Korea (Global)";
+const MARKET_CODE = "XG";
+
 const retailProductsSql = `
-INSERT INTO retail_products (product_id, ${MIRROR_COLS.join(", ")}, updated_at)
-SELECT product_id, ${MIRROR_COLS.join(", ")}, now()
+INSERT INTO retail_products (product_id, ${MIRROR_COLS.join(", ")}, market, market_code, updated_at)
+SELECT product_id, ${MIRROR_COLS.join(", ")}, '${MARKET_NAME}', '${MARKET_CODE}', now()
 FROM oliveyoung_global_products
 ON CONFLICT (product_id) DO UPDATE SET
   ${MIRROR_COLS.map((c) => `${c} = EXCLUDED.${c}`).join(",\n  ")},
+  market = EXCLUDED.market,
+  market_code = EXCLUDED.market_code,
   updated_at = now()`;
 
 /** Steps run in order; each is a single idempotent statement. */
@@ -93,9 +100,9 @@ const STEPS: { name: string; sql: string }[] = [
     sql: `
       INSERT INTO products_master (
         slug, name, barcode, domain, category_id, brand_id, launch_date,
-        price_benchmark_usd, market_status, primary_image_url, data_source,
-        verified, data_quality_score, is_best, is_new, source_url, how_to_use,
-        ingredients_text, sale_price, discount_rate, is_set, updated_at
+        price_benchmark_usd, market_status, market, market_code, primary_image_url,
+        data_source, verified, data_quality_score, is_best, is_new, source_url,
+        how_to_use, ingredients_text, sale_price, discount_rate, is_set, updated_at
       )
       SELECT
         trim(both '-' from lower(regexp_replace(
@@ -109,6 +116,8 @@ const STEPS: { name: string; sql: string }[] = [
         p.release_date,
         p.sale_price,
         CASE WHEN p.sell_status_code = '10' THEN 'Launched' ELSE 'Unknown' END,
+        '${MARKET_NAME}',
+        '${MARKET_CODE}',
         p.primary_image,
         'Olive Young Global',
         false,
@@ -140,6 +149,8 @@ const STEPS: { name: string; sql: string }[] = [
         launch_date = EXCLUDED.launch_date,
         price_benchmark_usd = EXCLUDED.price_benchmark_usd,
         market_status = EXCLUDED.market_status,
+        market = EXCLUDED.market,
+        market_code = EXCLUDED.market_code,
         primary_image_url = EXCLUDED.primary_image_url,
         data_quality_score = EXCLUDED.data_quality_score,
         is_best = EXCLUDED.is_best,
