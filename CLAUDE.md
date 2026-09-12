@@ -9,8 +9,17 @@ A data ingestion platform for global beauty-product intelligence. As of the
 (transform → AI → promotion → facts → enrichment → normalized core 8) was
 retired, and then the raw storage layer (object storage + `raw_documents`) was
 dropped too, because scraping the source's own APIs already yields clean,
-structured data. Ingestion fetches each product's API envelope IN MEMORY and
-writes the clean per-platform store directly — that store is the end product.
+structured data. Ingestion fetches each product's data IN MEMORY and writes the
+clean per-platform store directly — that store is the end product.
+
+**Two approved sources today**, each with its own per-platform store:
+- **Olive Young Global** (`oliveyoung-global`) — Korea (Global) / market `XG`.
+  Ingested from the site's own JSON APIs.
+- **@cosme** (`cosme-jp`) — Japan / market `JP`. Ingested from server-rendered
+  HTML + embedded JSON-LD (Shift_JIS), with Mistral JA→EN translation at ingest
+  (both languages stored, cached by source hash). @cosme is a review aggregator:
+  no stock/coupon, JPY reference price (often absent), 0–7 rating normalized to
+  0–5. See `playbooks/cosme-jp.*.md`.
 
 ```
 Phase 0                Phase 1
@@ -26,7 +35,7 @@ DISCOVER        ──►     INGEST + CLEAN        ──►  oliveyoung_global
    append a daily time-series snapshot. Nothing raw is persisted; the map can
    always re-drive a fresh fetch. Flips the map row pending → ingested.
 
-## The schema: 5 tables
+## The schema: core tables
 
 Defined in `packages/db/src/schema/`, migrated from `packages/db/migrations/`.
 
@@ -36,14 +45,17 @@ Defined in `packages/db/src/schema/`, migrated from `packages/db/migrations/`.
 - `discovery_runs`, `discovered_product_pages` — Phase 0 map (lean 8 columns;
   identity `(source_id, product_id)`; `batch_status` lifecycle
   pending → ingested).
-- `oliveyoung_global_products` — the clean per-platform end product. Fully
-  typed/decoded row per product; nested data (options, images, review
-  breakdown) as cleaned JSONB. **Per-platform by design** — each source's API
-  exposes different fields, so the next platform gets its own
-  `<platform>_products` table (e.g. `sephora_us_products`).
-- `oliveyoung_global_product_snapshots` — append-only daily observations
-  (price/rating/review-count/stock) keyed `(product_id, captured_at)`; powers
-  dashboard trends, momentum, and price-drop / OOS alerts.
+- `oliveyoung_global_products` (+ `_snapshots`) — Olive Young's clean per-platform
+  end product. Fully typed/decoded row per product; nested data (options, images,
+  review breakdown) as cleaned JSONB.
+- `cosme_jp_products` (+ `_snapshots`) — @cosme's clean per-platform store.
+  Japanese fields stored as `*_ja` + translated `*_en`; rating kept raw (0–7) and
+  normalized (0–5); JPY reference price + variants; `source_hash` caches the
+  translation. Added migration `0024`.
+- **Per-platform by design** — each source exposes different fields, so every new
+  source gets its own `<platform>_products` table (+ `_snapshots`). The `_snapshots`
+  tables are append-only daily observations keyed `(product_id, captured_at)`;
+  they power dashboard trends, momentum, and price-drop / OOS alerts.
 
 ## Architecture rules
 
@@ -63,24 +75,32 @@ Defined in `packages/db/src/schema/`, migrated from `packages/db/migrations/`.
 
 ## Commands
 
-- `pnpm discover:run` — map the catalog (category-crawl API).
-- `pnpm ingest:api oliveyoung-global [n]` — fetch + clean n pending products
-  straight into the clean store + snapshots (idempotent; reads
-  `discovered_product_pages` pending directly).
-- `pnpm distribute` — rebuild the dashboard serving tables from the clean store
+- `pnpm discover:run [slug]` — map the catalog. No slug = every enabled source;
+  a slug (`cosme-jp`) maps just that one. Strategy per source: Olive Young uses
+  the category-crawl JSON API, @cosme the `pagination` HTML crawl.
+- `pnpm ingest:api <slug> [n]` — fetch + clean n pending products straight into
+  that source's clean store + snapshots (idempotent; reads
+  `discovered_product_pages` pending directly). Dispatches by slug:
+  `oliveyoung-global` (JSON APIs) or `cosme-jp` (HTML+JSON-LD + Mistral
+  translation; needs `MISTRAL_API_KEY`). Default slug `oliveyoung-global`.
+- `pnpm distribute` — rebuild the dashboard serving tables from ALL clean stores
   (see below). Idempotent; safe to run after every ingest.
-- `pnpm db:seed` — bootstrap the `oliveyoung-global` source + discovery_config.
+- `pnpm db:seed` — bootstrap the approved sources + their discovery_config.
 
 ## Dashboard serving layer (derived)
 
 The Retail dashboard reads a set of **derived** tables that are pure projections
-of `oliveyoung_global_products` (+ snapshots), rebuilt by `pnpm distribute`
-(migration `0018`, schema `packages/db/src/schema/serving.ts`):
+of the per-platform clean stores (+ snapshots), rebuilt by `pnpm distribute`
+(migration `0018`, schema `packages/db/src/schema/serving.ts`). Distribute is
+**multi-source**: step 0 defines a view `serving_source_products` that UNIONs
+every clean store into one common shape with a per-row market (Olive Young →
+Korea (Global)/`XG`, @cosme → Japan/`JP`), and every projection reads that view —
+so a new platform is wired in by adding a branch to the view.
 
 - `brands`, `categories`, `markets` — dimensions (distinct brands/categories;
-  markets seeded with one row for our data: code `XG`, display name
-  "Korea (Global)" 🇰🇷, since Olive Young Global is Korea's single cross-border
-  storefront. The internal code stays `XG` — `KR` is a separate domestic row).
+  markets holds `XG` "Korea (Global)" 🇰🇷 and `JP` "Japan" 🇯🇵. The `XG` code
+  stays for Olive Young's cross-border storefront — `KR` is a separate domestic
+  row used by the news feature).
 - `retail_products` — flat 1:1 mirror of the clean store (leaderboard).
 - `products_master` — normalized canonical hub (FKs to brands/categories);
   enrichment columns the source lacks (skin types, SPF, texture, price segment,
@@ -95,8 +115,14 @@ of `oliveyoung_global_products` (+ snapshots), rebuilt by `pnpm distribute`
   demand weight); all revenue columns (`revenue`, `*_revenue`,
   `market_share_pct`) stay null.
 - `retail_pulse_shelf_share` — weekly per-product presence. `oos_pct` (from
-  stock_qty) and `promo_pct` (from discount_rate) are REAL; `shelf_share_pct`
-  is a review-volume proxy and `facings` is null (no planogram source).
+  stock_qty) and `promo_pct` (from discount_rate) are REAL for Olive Young;
+  `shelf_share_pct` is a review-volume proxy and `facings` is null (no planogram
+  source). @cosme has no stock, so its `oos_pct` is **null** (not 100 = OOS).
+
+Per-market honesty across sources: @cosme rows carry `currency = 'JPY'` on
+`retail_products.sale_price` and leave `price_benchmark_usd` null (no USD price);
+having no star histogram, their sentiment pos/neg/neu are null while the
+review-weighted score still computes.
 
 Nothing here is a source of truth — it can be dropped and re-derived. **Caveat:**
 across the proxy tables, `units_sold` / `mention_count` / `*_share_pct` are
@@ -140,5 +166,5 @@ ops pain) with no effect on the final clean row.
 - Migrations: `pnpm build` (domain first), then `pnpm db:generate --name …`;
   never edit applied migrations. Internal packages resolve from `dist/` — run
   `pnpm build` after changing them.
-- Approved source: Olive Young Global. Do NOT add other live sources without
-  explicit approval.
+- Approved sources: Olive Young Global (`oliveyoung-global`) and @cosme
+  (`cosme-jp`). Do NOT add other live sources without explicit approval.

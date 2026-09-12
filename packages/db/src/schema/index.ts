@@ -24,6 +24,9 @@ export {
   oliveyoungGlobalProductSnapshots,
 } from "./platform-oliveyoung.js";
 
+// @cosme (Japan) — second per-platform clean store + snapshots
+export { cosmeJpProducts, cosmeJpProductSnapshots } from "./platform-cosme.js";
+
 // Dashboard serving layer — derived tables projected from the clean store by
 // `pnpm distribute` (the dashboard reads these).
 export {

@@ -17,6 +17,12 @@ const envSchema = z.object({
 
   // Fetch timeout for discovery + ingestion HTTP calls.
   INGEST_FETCH_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+
+  // Translation (JA→EN at ingest for the @cosme Japan source). Optional: the
+  // Olive Young flow needs none of these; the cosme flow requires MISTRAL_API_KEY.
+  MISTRAL_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().default("mistral-small-latest"),
+  AI_PROVIDER: z.string().default("mistral"),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

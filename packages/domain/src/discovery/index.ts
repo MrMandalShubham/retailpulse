@@ -64,6 +64,16 @@ export interface DiscoveryConfig {
   requestTemplate?: Record<string, unknown>;
   /** Safety cap on pages per category. */
   maxPagesPerCategory?: number;
+
+  // --- pagination strategy (paginated server-rendered HTML listing, e.g. @cosme) ---
+  /** Listing URL template with {cat} + {page} placeholders
+   *  (e.g. "https://www.cosme.net/categories/item/{cat}/ranking/?page={page}"). */
+  listingUrlTemplate?: string;
+  /** Character set to decode listing + product pages with (e.g. "shift_jis"). */
+  charset?: string;
+  /** Regex (with one capture group) that pulls the product id out of a listing
+   *  page's product hrefs (e.g. "/products/(\\d+)/"). */
+  productIdRegex?: string;
 }
 
 /** Audit row for one discovery execution. */

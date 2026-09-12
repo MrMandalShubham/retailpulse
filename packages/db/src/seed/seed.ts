@@ -42,24 +42,54 @@ const OLIVE_YOUNG_GLOBAL = {
   notes: "Approved source. Discovery via category API; ingestion via product JSON APIs.",
 };
 
-await db
-  .insert(sources)
-  .values(OLIVE_YOUNG_GLOBAL)
-  .onConflictDoUpdate({
-    target: sources.slug,
-    set: {
-      name: OLIVE_YOUNG_GLOBAL.name,
-      baseUrl: OLIVE_YOUNG_GLOBAL.baseUrl,
-      sourceType: OLIVE_YOUNG_GLOBAL.sourceType,
-      enabled: OLIVE_YOUNG_GLOBAL.enabled,
-      seedUrls: OLIVE_YOUNG_GLOBAL.seedUrls,
-      scrapeStrategy: OLIVE_YOUNG_GLOBAL.scrapeStrategy,
-      discoveryConfig: OLIVE_YOUNG_GLOBAL.discoveryConfig,
-      notes: OLIVE_YOUNG_GLOBAL.notes,
-      updatedAt: new Date(),
-    },
-  });
-console.log(`seeded source '${OLIVE_YOUNG_GLOBAL.slug}'`);
+// @cosme (アットコスメ) — the approved Japan source. Discovery crawls each
+// category's paginated ranking listing (server-rendered Shift_JIS HTML) for
+// /products/{id}/ links; Phase 1 ingest:api fetches each product page, parses
+// JSON-LD + the Shift_JIS info block, and translates JA→EN via Mistral.
+const COSME_JP = {
+  name: "@cosme (Japan)",
+  slug: "cosme-jp",
+  baseUrl: "https://www.cosme.net/",
+  sourceType: "marketplace",
+  enabled: true,
+  seedUrls: ["https://www.cosme.net/"],
+  scrapeStrategy: "HTML + JSON-LD ingestion (see playbooks/cosme-jp.ingestion.md).",
+  discoveryConfig: {
+    strategy: "pagination",
+    listingUrlTemplate: "https://www.cosme.net/categories/item/{cat}/ranking/?page={page}",
+    productUrlBase: "https://www.cosme.net/products/",
+    productIdRegex: "/products/(\\d+)/",
+    charset: "shift_jis",
+    // Leaf categories across skincare + makeup (see cosme-jp.discovery.md).
+    categoryNos: [
+      "900", "901", "902", "1004", "1006", "904", "1037",
+      "910", "911", "912", "1015", "914", "916", "920",
+    ],
+    maxPagesPerCategory: 4, // ~13 products/page × 4 × 14 cats ≈ 500 discovered (dedup)
+  },
+  notes: "Approved Japan source. Review aggregator (no storefront) — price is a JPY reference price and often absent.",
+};
+
+for (const src of [OLIVE_YOUNG_GLOBAL, COSME_JP]) {
+  await db
+    .insert(sources)
+    .values(src)
+    .onConflictDoUpdate({
+      target: sources.slug,
+      set: {
+        name: src.name,
+        baseUrl: src.baseUrl,
+        sourceType: src.sourceType,
+        enabled: src.enabled,
+        seedUrls: src.seedUrls,
+        scrapeStrategy: src.scrapeStrategy,
+        discoveryConfig: src.discoveryConfig,
+        notes: src.notes,
+        updatedAt: new Date(),
+      },
+    });
+  console.log(`seeded source '${src.slug}'`);
+}
 
 await pool.end();
 process.exit(0);

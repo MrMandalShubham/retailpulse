@@ -1,6 +1,7 @@
 import type { DiscoveryConfig } from "@dip/domain";
 import { normalizeSourceUrl } from "./url.js";
 import { discoverViaCategoryApi } from "./category.js";
+import { discoverViaPagination } from "./cosme.js";
 import { type DiscoveredUrl, discoverViaSitemap } from "./sitemap.js";
 
 /**
@@ -49,10 +50,14 @@ export interface DiscoveryDeps {
   repo: DiscoveryRepo;
   fetchText(url: string): Promise<string | null>;
   postJson(url: string, body: unknown): Promise<unknown | null>;
+  /** Raw page bytes (charset-agnostic) — used by the `pagination` strategy. */
+  fetchBytes(url: string, userAgent?: string): Promise<Uint8Array | null>;
   logger: DiscoveryLogger;
+  /** When set, only this source slug is discovered (else every enabled source). */
+  onlySlug?: string;
 }
 
-const SUPPORTED: ReadonlySet<string> = new Set(["sitemap", "category_crawl"]);
+const SUPPORTED: ReadonlySet<string> = new Set(["sitemap", "category_crawl", "pagination"]);
 
 export interface DiscoverySummary {
   sourceSlug: string;
@@ -65,7 +70,10 @@ export interface DiscoverySummary {
 
 export async function runDiscoveryCycle(deps: DiscoveryDeps): Promise<DiscoverySummary[]> {
   const summaries: DiscoverySummary[] = [];
-  const sources = await deps.repo.listDiscoverableSources();
+  const allSources = await deps.repo.listDiscoverableSources();
+  const sources = deps.onlySlug
+    ? allSources.filter((s) => s.slug === deps.onlySlug)
+    : allSources;
 
   for (const source of sources) {
     const cfg = source.discoveryConfig;
@@ -77,13 +85,17 @@ export async function runDiscoveryCycle(deps: DiscoveryDeps): Promise<DiscoveryS
 
     const { id: runId } = await deps.repo.createRun(source.id, cfg.strategy);
     try {
-      const urls: DiscoveredUrl[] =
-        cfg.strategy === "category_crawl"
-          ? await discoverViaCategoryApi(cfg, { postJson: deps.postJson, logger: deps.logger })
-          : await discoverViaSitemap(source.baseUrl, cfg, {
-              fetchText: deps.fetchText,
-              logger: deps.logger,
-            });
+      let urls: DiscoveredUrl[];
+      if (cfg.strategy === "category_crawl") {
+        urls = await discoverViaCategoryApi(cfg, { postJson: deps.postJson, logger: deps.logger });
+      } else if (cfg.strategy === "pagination") {
+        urls = await discoverViaPagination(cfg, { fetchBytes: deps.fetchBytes, logger: deps.logger });
+      } else {
+        urls = await discoverViaSitemap(source.baseUrl, cfg, {
+          fetchText: deps.fetchText,
+          logger: deps.logger,
+        });
+      }
 
       // Dedup by native product id (the identity key).
       const byId = new Map<string, PageRecord>();
