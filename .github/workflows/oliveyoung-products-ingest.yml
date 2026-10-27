@@ -1,0 +1,86 @@
+name: OliveYoungProductsIngest
+
+# Combined flow: Discover new products → Ingest batch → Distribute to serving.
+# Runs hourly — each cycle discovers any new OY products that appeared on-site,
+# ingests up to 300 pending products, then rebuilds the dashboard serving tables.
+# When no pending products remain, the ingest step is a no-op.
+
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Products per batch"
+        default: "300"
+        type: string
+
+concurrency:
+  group: oliveyoung-ingest
+  cancel-in-progress: false
+
+env:
+  SOURCE_SLUG: oliveyoung-global
+
+jobs:
+  discover-ingest-distribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # --- Step 1: Discover new products ---
+      - name: Discover new products
+        id: discover
+        run: pnpm discover:run "$SOURCE_SLUG" 2>&1 | tee /tmp/discover.log
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # --- Step 2: Ingest batch ---
+      - name: Ingest batch (up to ${{ inputs.batch_size || '300' }} products)
+        id: ingest
+        run: |
+          BATCH="${{ inputs.batch_size || '300' }}"
+          echo "::group::Ingesting up to $BATCH products from $SOURCE_SLUG"
+          pnpm ingest:api "$SOURCE_SLUG" "$BATCH" 2>&1 | tee /tmp/ingest.log
+          echo "::endgroup::"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # --- Step 3: Distribute to serving tables ---
+      - name: Distribute to serving tables
+        run: pnpm distribute
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # --- Summary ---
+      - name: Run summary
+        if: always()
+        run: |
+          echo "## Olive Young Ingest Run" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Source:** $SOURCE_SLUG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Batch size:** ${{ inputs.batch_size || '300' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Timestamp:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Discovery" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /tmp/discover.log ]; then
+            tail -5 /tmp/discover.log >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Ingestion" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /tmp/ingest.log ]; then
+            tail -5 /tmp/ingest.log >> "$GITHUB_STEP_SUMMARY"
+          fi
