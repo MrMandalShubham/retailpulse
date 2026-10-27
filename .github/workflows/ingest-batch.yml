@@ -1,0 +1,60 @@
+name: Ingest Batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Source slug"
+        default: "oliveyoung-global"
+        type: string
+      batch_size:
+        description: "Products per batch"
+        default: "300"
+        type: string
+      run_distribute:
+        description: "Run distribute after ingestion"
+        default: true
+        type: boolean
+  schedule:
+    # Every hour — each run ingests up to 300 pending products.
+    # When no pending products remain, the run is a no-op.
+    - cron: "0 * * * *"
+
+concurrency:
+  group: ingest-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Ingest batch
+        run: |
+          SOURCE="${{ inputs.source || 'oliveyoung-global' }}"
+          BATCH="${{ inputs.batch_size || '300' }}"
+          echo "Ingesting up to $BATCH products from $SOURCE"
+          pnpm ingest:api "$SOURCE" "$BATCH"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+
+      - name: Distribute to serving tables
+        if: ${{ inputs.run_distribute == '' || inputs.run_distribute == 'true' }}
+        run: pnpm distribute
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
