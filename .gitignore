@@ -18,6 +18,9 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Claude Code config (local only)
+CLAUDE.md
+
 # Pre-repo planning material (local only, not part of the codebase).
 # Anchored to the repo root: on Windows, git matches ignore patterns
 # case-insensitively, and an unanchored "DB/" would swallow packages/db/.
