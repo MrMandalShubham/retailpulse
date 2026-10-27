@@ -9,7 +9,8 @@
     "start": "node dist/main.js",
     "ingest-api": "tsx src/ingest-api.ts",
     "distribute": "tsx src/distribute.ts",
-    "discover": "tsx src/discover.ts"
+    "discover": "tsx src/discover.ts",
+    "pending-count": "tsx src/pending-count.ts"
   },
   "dependencies": {
     "@dip/config": "workspace:*",

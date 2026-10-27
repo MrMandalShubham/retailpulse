@@ -20,7 +20,8 @@
     "db:studio": "pnpm --filter @dip/db studio",
     "discover:run": "pnpm --filter @dip/worker discover run",
     "ingest:api": "pnpm --filter @dip/worker ingest-api",
-    "distribute": "pnpm --filter @dip/worker distribute"
+    "distribute": "pnpm --filter @dip/worker distribute",
+    "pending-count": "pnpm --filter @dip/worker pending-count"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",
