@@ -6,7 +6,7 @@ name: OliveYoungProductsIngest
 
 on:
   schedule:
-    - cron: "0 * * * *" # every hour
+    - cron: "5 * * * *" # every hour at :05 (avoids GitHub's top-of-hour congestion)
   workflow_dispatch:
     inputs:
       batch_size:
