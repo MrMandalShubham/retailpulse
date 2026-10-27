@@ -24,9 +24,7 @@ const { db, pool } = createDb(config.DATABASE_URL);
 
 // Optional source-slug filter: `pnpm discover:run cosme-jp` maps only that
 // source. (The npm script forwards a literal "run" token, so ignore it + flags.)
-const onlySlug = process.argv
-  .slice(2)
-  .find((a) => a !== "run" && !a.startsWith("-"));
+const onlySlug = process.argv.slice(2).find((a) => a !== "run" && !a.startsWith("-"));
 
 try {
   const repo = createDiscoveryRepo(db);

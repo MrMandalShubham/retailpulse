@@ -71,9 +71,7 @@ export interface DiscoverySummary {
 export async function runDiscoveryCycle(deps: DiscoveryDeps): Promise<DiscoverySummary[]> {
   const summaries: DiscoverySummary[] = [];
   const allSources = await deps.repo.listDiscoverableSources();
-  const sources = deps.onlySlug
-    ? allSources.filter((s) => s.slug === deps.onlySlug)
-    : allSources;
+  const sources = deps.onlySlug ? allSources.filter((s) => s.slug === deps.onlySlug) : allSources;
 
   for (const source of sources) {
     const cfg = source.discoveryConfig;
@@ -89,7 +87,10 @@ export async function runDiscoveryCycle(deps: DiscoveryDeps): Promise<DiscoveryS
       if (cfg.strategy === "category_crawl") {
         urls = await discoverViaCategoryApi(cfg, { postJson: deps.postJson, logger: deps.logger });
       } else if (cfg.strategy === "pagination") {
-        urls = await discoverViaPagination(cfg, { fetchBytes: deps.fetchBytes, logger: deps.logger });
+        urls = await discoverViaPagination(cfg, {
+          fetchBytes: deps.fetchBytes,
+          logger: deps.logger,
+        });
       } else {
         urls = await discoverViaSitemap(source.baseUrl, cfg, {
           fetchText: deps.fetchText,

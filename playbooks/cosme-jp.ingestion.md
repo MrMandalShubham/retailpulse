@@ -11,11 +11,11 @@
 
 ## Methods evaluated
 
-| Method                    | Result                                                                                   | Verdict            |
-| ------------------------- | ---------------------------------------------------------------------------------------- | ------------------ |
-| Product JSON API          | @cosme exposes none (it's a review aggregator, not a store)                              | ❌ not available   |
-| **HTML + JSON-LD**        | Node `fetch` returns 200 (~200–330 KB); JSON-LD gives name/brand/rating/reviews; the Shift_JIS info block gives price/size/release; the ranking line gives rank + category | ✅ **chosen**      |
-| Playwright browser render | Would only add the JS-loaded have/want counts; heavy for marginal fields                 | 🟡 not built       |
+| Method                    | Result                                                                                                                                                                     | Verdict          |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Product JSON API          | @cosme exposes none (it's a review aggregator, not a store)                                                                                                                | ❌ not available |
+| **HTML + JSON-LD**        | Node `fetch` returns 200 (~200–330 KB); JSON-LD gives name/brand/rating/reviews; the Shift_JIS info block gives price/size/release; the ranking line gives rank + category | ✅ **chosen**    |
+| Playwright browser render | Would only add the JS-loaded have/want counts; heavy for marginal fields                                                                                                   | 🟡 not built     |
 
 ## The product page (tested contract — no cookies required)
 
@@ -67,10 +67,10 @@ The fetcher assembles an **in-memory** envelope `{ product_id, source,
 source_url, fetched_at, html, http_status }`; nothing raw is persisted. Per
 successful product:
 
-| Output                                                             | Content                                                                                          |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Output                                                             | Content                                                                                                                                                                   |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cosme_jp_products` (upsert on `product_id`)                       | one clean typed row — identity, name/brand (JA+EN), category (JA+EN), rank, rating (raw+0–5), review count, price/size/variants (JPY), image, release date, `source_hash` |
-| `cosme_jp_product_snapshots` (upsert on `product_id, captured_at`) | that day's rating / review-count / rank / price observation                                      |
+| `cosme_jp_product_snapshots` (upsert on `product_id, captured_at`) | that day's rating / review-count / rank / price observation                                                                                                               |
 
 `crawl_jobs` logs the run. Recovery from a bad/missing row is a re-run of
 `ingest:api` from the map — there is no raw copy to restore.

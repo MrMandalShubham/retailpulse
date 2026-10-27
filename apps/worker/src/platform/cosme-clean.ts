@@ -150,7 +150,10 @@ function parsePriceSize(raw: string | undefined): {
   const empty = { price: null, sizeValue: null, sizeUnit: null, variants: [] as PriceVariant[] };
   if (!raw) return empty;
   // NFKC folds fullwidth latin/digits to ASCII; drop editorial annotations.
-  const cleaned = raw.normalize("NFKC").replace(/[（(][^）)]*[）)]/g, " ").trim();
+  const cleaned = raw
+    .normalize("NFKC")
+    .replace(/[（(][^）)]*[）)]/g, " ")
+    .trim();
   const variants: PriceVariant[] = [];
   for (const seg of cleaned.split("/")) {
     const parts = seg.split(/[・·]/).map((s) => s.trim());
@@ -216,7 +219,9 @@ function ogImage(html: string): string | null {
   const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
   if (m?.[1] && m[1].startsWith("http")) return m[1];
   // fallback: first product CDN image
-  const cdn = html.match(/https:\/\/cache-cdn\.cosme\.net\/media\/product\/[^\s"'<>]+\.(?:jpg|png)/i);
+  const cdn = html.match(
+    /https:\/\/cache-cdn\.cosme\.net\/media\/product\/[^\s"'<>]+\.(?:jpg|png)/i,
+  );
   return cdn?.[0] ?? null;
 }
 
@@ -273,7 +278,9 @@ export function cosmeTranslationSource(p: CosmeParsed): Record<string, string> {
 }
 
 export function cosmeSourceHash(p: CosmeParsed): string {
-  return createHash("md5").update(JSON.stringify(cosmeTranslationSource(p))).digest("hex");
+  return createHash("md5")
+    .update(JSON.stringify(cosmeTranslationSource(p)))
+    .digest("hex");
 }
 
 function ratingNormalized(raw: number | null): string | null {
