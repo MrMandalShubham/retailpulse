@@ -34,6 +34,7 @@ export interface SyncRepo {
   upsertClean(row: CleanProduct): Promise<void>;
   upsertSnapshot(row: CleanProduct): Promise<void>;
   markProductsIngested(ids: string[]): Promise<void>;
+  markProductsFailed(ids: string[]): Promise<void>;
 }
 
 export interface SyncDeps {
@@ -53,6 +54,7 @@ export interface SyncSummary {
   cleaned: number;
   snapshots: number;
   failed: number;
+  delisted: number;
   markedIngested: number;
   status: "succeeded" | "failed" | "skipped";
 }
@@ -65,6 +67,7 @@ export async function runSyncCycle(deps: SyncDeps): Promise<SyncSummary> {
     cleaned: 0,
     snapshots: 0,
     failed: 0,
+    delisted: 0,
     markedIngested: 0,
     status,
   });
@@ -87,6 +90,7 @@ export async function runSyncCycle(deps: SyncDeps): Promise<SyncSummary> {
   let cleaned = 0;
   let failed = 0;
   const ingestedIds: string[] = [];
+  const delistedIds: string[] = [];
 
   try {
     for (const [i, product] of products.entries()) {
@@ -101,20 +105,35 @@ export async function runSyncCycle(deps: SyncDeps): Promise<SyncSummary> {
         ingestedIds.push(product.id);
         cleaned += 1;
       } else {
-        // detail-data failed (delisted / transient) — leave the row pending.
         failed += 1;
-        deps.logger.warn(
-          {
-            source: deps.sourceSlug,
-            productId: product.productId,
-            statuses: result.endpointStatuses,
-          },
-          "product fetch failed",
-        );
+        const allHttp200 = Object.values(result.endpointStatuses).every((s) => s === 200);
+        if (allHttp200) {
+          // API responded 200 but returned no usable product data — delisted.
+          delistedIds.push(product.id);
+          deps.logger.warn(
+            {
+              source: deps.sourceSlug,
+              productId: product.productId,
+              detailOk: result.ok,
+            },
+            "product delisted — 200 but no product data, marking failed",
+          );
+        } else {
+          // Non-200 on at least one endpoint — transient, stays pending for retry.
+          deps.logger.warn(
+            {
+              source: deps.sourceSlug,
+              productId: product.productId,
+              statuses: result.endpointStatuses,
+            },
+            "product fetch failed (transient)",
+          );
+        }
       }
     }
 
     if (ingestedIds.length > 0) await deps.repo.markProductsIngested(ingestedIds);
+    if (delistedIds.length > 0) await deps.repo.markProductsFailed(delistedIds);
     const status = cleaned > 0 ? "succeeded" : "failed";
     await deps.repo.finishRun(
       runId,
@@ -122,7 +141,15 @@ export async function runSyncCycle(deps: SyncDeps): Promise<SyncSummary> {
       status === "failed" ? `all ${products.length} product fetches failed` : null,
     );
     deps.logger.info(
-      { source: deps.sourceSlug, runId, cleaned, failed, markedIngested: ingestedIds.length },
+      {
+        source: deps.sourceSlug,
+        runId,
+        cleaned,
+        failed,
+        delisted: delistedIds.length,
+        transient: failed - delistedIds.length,
+        markedIngested: ingestedIds.length,
+      },
       "ingest complete",
     );
     return {
@@ -132,6 +159,7 @@ export async function runSyncCycle(deps: SyncDeps): Promise<SyncSummary> {
       cleaned,
       snapshots: cleaned,
       failed,
+      delisted: delistedIds.length,
       markedIngested: ingestedIds.length,
       status,
     };
@@ -210,6 +238,11 @@ export function createSyncRepo(db: Db): SyncRepo {
     async markProductsIngested(ids) {
       if (ids.length === 0) return;
       await db.update(dpp).set({ batchStatus: "ingested" }).where(inArray(dpp.id, ids));
+    },
+
+    async markProductsFailed(ids) {
+      if (ids.length === 0) return;
+      await db.update(dpp).set({ batchStatus: "failed" }).where(inArray(dpp.id, ids));
     },
   };
 }
