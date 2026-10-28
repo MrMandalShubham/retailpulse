@@ -1,17 +1,14 @@
 name: OliveYoungProductsIngest
 
 # Combined flow: Discover (if needed) → Ingest batch → Distribute.
-# Runs hourly. Discovery only runs when pending products < batch size,
-# so we don't re-crawl the entire catalog every hour for nothing.
+# Manual trigger only — GitHub's cron is unreliable for hourly runs.
 
 on:
-  schedule:
-    - cron: "5 * * * *" # every hour at :05 (avoids GitHub's top-of-hour congestion)
   workflow_dispatch:
     inputs:
       batch_size:
         description: "Products per batch"
-        default: "300"
+        default: "3000"
         type: string
       force_discover:
         description: "Force discovery even if enough pending"
@@ -24,12 +21,12 @@ concurrency:
 
 env:
   SOURCE_SLUG: oliveyoung-global
-  BATCH_SIZE: "300"
+  BATCH_SIZE: "3000"
 
 jobs:
   discover-ingest-distribute:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
